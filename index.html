@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SURYA TOURNAMENT</title>
+    <link rel="stylesheet" href="styles.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="loadingPage">
+        <div class="spinner"></div>
+        <h2>Loading SURYA Tournament...</h2>
+    </div>
+
+    <div class="container hidden" id="mainContainer">
+        
+        <div id="welcomePage" class="page active">
+            <h1>Welcome to SURYA Tournament</h1>
+            <p>Your ultimate gaming battleground!</p>
+            <button onclick="playClickSound(); app.showPage('loginPage');">Login</button>
+            <button onclick="playClickSound(); app.showPage('signupPage');">Signup</button>
+        </div>
+
+        <div id="loginPage" class="page hidden">
+            <h2>Login</h2>
+            <input type="email" id="loginEmail" placeholder="Email" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button onclick="app.loginUser();">Login</button>
+            <p><a href="#" onclick="playClickSound(); app.showPage('signupPage');">Don't have an account? Signup</a></p>
+            <p><a href="#" onclick="app.resetPassword();">Forgot Password?</a></p>
+            <div id="loginMessage" class="message hidden"></div>
+            <button onclick="playClickSound(); app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
+        </div>
+
+        <div id="signupPage" class="page hidden">
+            <h2>Signup</h2>
+            <input type="email" id="signupEmail" placeholder="Email" required>
+            <input type="password" id="signupPassword" placeholder="Password" required>
+            <button onclick="app.signupUser();">Signup</button>
+            <p><a href="#" onclick="playClickSound(); app.showPage('loginPage');">Already have an account? Login</a></p>
+            <div id="signupMessage" class="message hidden"></div>
+            <button onclick="playClickSound(); app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
+        </div>
+
+        <div id="dashboardPage" class="page hidden">
+            <div class="header">
+                <h2 id="welcomeUser">Welcome, Player!</h2>
+                <div>
+                    <button onclick="app.showLeaderboard();">Leaderboard</button>
+                    <button onclick="app.logoutUser();">Logout</button>
+                </div>
+            </div>
+
+            <h3>Select Mode</h3>
+            <div class="mode-grid" id="modeGrid">
+                <div class="mode-card" data-mode="1v1" onclick="app.selectMode('1v1');">
+                    <img src="https://i.postimg.cc/QdWSGxpv/1v1.jpg" alt="1v1 Mode" class="mode-image">
+                </div>
+                <div class="mode-card" data-mode="2v2" onclick="app.selectMode('2v2');">
+                    <img src="https://i.postimg.cc/x1HGppQz/2v2.jpg" alt="2v2 Mode" class="mode-image">
+                </div>
+                <div class="mode-card" data-mode="3v3" onclick="app.selectMode('3v3');">
+                    <img src="https://i.postimg.cc/QtMTD027/3v3.jpg" alt="3v3 Mode" class="mode-image">
+                </div>
+                <div class="mode-card" data-mode="4v4" onclick="app.selectMode('4v4');">
+                    <img src="https://i.postimg.cc/FKTYT0YX/4v4.jpg" alt="4v4 Mode" class="mode-image">
+                </div>
+                <div class="mode-card" data-mode="BR48" onclick="app.selectMode('BR48');">
+                    <img src="https://i.postimg.cc/bNPtgxgs/br.jpg" alt="BR48 Mode" class="mode-image">
+                </div>
+            </div>
+
+            <div id="adminPanel" class="hidden">
+                <h3>Admin Controls</h3>
+                <div class="admin-controls">
+                    <label for="adminMatchMode">Select Mode to Create Match:</label>
+                    <select id="adminMatchMode">
+                        <option value="1v1">1v1</option>
+                        <option value="2v2">2v2</option>
+                        <option value="3v3">3v3</option>
+                        <option value="4v4">4v4</option>
+                        <option value="BR48">BR48</option>
+                    </select>
+                    <input type="text" id="adminRoomId" placeholder="Room ID (e.g., GAME123)" required>
+                    <input type="text" id="adminRoomPass" placeholder="Room Password (e.g., SURYA@123)" required>
+                    <input type="datetime-local" id="adminMatchStartTime" required>
+                    <button onclick="app.createMatch();">Create New Match</button>
+                    <div id="adminMatchMessage" class="message hidden"></div>
+                </div>
+                <h4>Active Matches (Admin View)</h4>
+                <div id="adminMatchList" class="match-list"></div>
+            </div>
+        </div>
+
+        <div id="matchListPage" class="page hidden">
+            <h2 id="matchListTitle">Matches for [Mode]</h2>
+            <div id="matchesContainer" class="match-list"></div>
+            <button onclick="app.showPage('dashboardPage');" style="margin-top: 20px;">Back to Dashboard</button>
+        </div>
+
+        <div id="slotPage" class="page hidden">
+            <h2 id="slotPageMatchTitle">Match Details</h2>
+            <div class="match-item" id="currentMatchDetails">
+                <div class="match-details">
+                    <span><strong>Match:</strong> <span id="currentMatchName"></span></span>
+                    <span><strong>Start Time:</strong> <span id="currentMatchStartTime"></span></span>
+                    <span><strong>Countdown:</strong> <span id="slotPageTimer">--:--:--</span></span> 
+                </div>
+                <div class="room-info">
+                    <div>Room ID: <span id="revealedRoomId">********</span></div>
+                    <div>Room Pass: <span id="revealedRoomPass">********</span></div>
+                </div>
+            </div>
+
+            <div id="ffUidInputSection">
+                <h3>Enter Your Free Fire UID</h3>
+                <input type="text" id="ffUidInput" placeholder="Free Fire UID" required>
+                <button onclick="app.saveFFUid();">Save UID</button>
+                <div id="ffUidMessage" class="message hidden"></div>
+            </div>
+
+            <h3>Slots (<span id="slotsCount">0</span>/<span id="maxSlots">0</span>)</h3>
+            <div id="slotsContainer" class="slot-list"></div>
+            <div id="slotPageMessage" class="message hidden"></div>
+            <button onclick="app.backToMatchList();" style="margin-top: 20px;">Back to Matches</button>
+        </div>
+
+        <div id="leaderboardPage" class="page hidden">
+            <h2>Leaderboard</h2>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Wins</th>
+                        <th>Kills</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody">
+                    <tr><td>1</td><td>ProGamerX</td><td>15</td><td>120</td></tr>
+                    <tr><td>2</td><td>EliteSniper</td><td>12</td><td>95</td></tr>
+                    <tr><td>3</td><td>NoobMaster69</td><td>10</td><td>80</td></tr>
+                    <tr><td>4</td><td>ShadowBlade</td><td>9</td><td>75</td></tr>
+                    <tr><td>5</td><td>ThunderBolt</td><td>8</td><td>70</td></tr>
+                </tbody>
+            </table>
+            <button onclick="app.showPage('dashboardPage');" style="margin-top: 20px;">Back to Dashboard</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    
+    <script src="firebase-setup.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
