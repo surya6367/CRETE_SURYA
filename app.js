@@ -1,4 +1,4 @@
-// --- 1. FIREBASE CONFIGURATION (Moved inside app.init to fix loading error) ---
+// --- 1. FIREBASE CONFIGURATION ---
 // नोट: यह Firebase कॉन्फ़िगरेशन आपके प्रोजेक्ट के अनुसार है।
 const firebaseConfig = {
     apiKey: "AIzaSyBQM0KrwvcsUckhJArkvAhPMD1_n_ytuoM",
@@ -10,7 +10,7 @@ const firebaseConfig = {
     databaseURL: "https://freefiretournament-5d4f5-default-rtdb.firebaseio.com"
 };
 
-// Firebase ऑब्जेक्ट्स को ग्लोबल स्कोप में रखें लेकिन उन्हें app.init में असाइन करें
+// Firebase ऑब्जेक्ट्स को पहले नल (null) पर सेट करें
 let auth = null;
 let db = null;
 let appInstance = null;
@@ -89,6 +89,7 @@ function getSlotLimit(mode) {
         case '2v2': return 4;
         case '3v3': return 6;
         case '4v4': return 8;
+        case 'BR48': return 48;
         default: return 0;
     }
 }
@@ -104,8 +105,15 @@ function displayMessage(element, message, type) {
 
 // --- 3. APPLICATION LOGIC ---
 const app = {
-    // Firebase और Auth को इनिशियलाइज़ करने के लिए नया फ़ंक्शन
+    // FIX 1: सुरक्षित Firebase इनिशियलाइज़ेशन
     init: () => {
+        // यह जांचें कि 'firebase' ऑब्जेक्ट परिभाषित है या नहीं
+        if (typeof firebase === 'undefined' || typeof firebase.initializeApp === 'undefined') {
+             console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
+             document.getElementById('loadingPage').innerHTML = '<h2>त्रुटि: Firebase लाइब्रेरी लोड नहीं हुई। index.html जांचें।</h2>';
+             return;
+        }
+
         try {
             // Firebase को इनिशियलाइज़ करें
             appInstance = firebase.initializeApp(firebaseConfig);
@@ -819,7 +827,7 @@ const app = {
             } else if (result.snapshot.val() !== null) {
                 displayMessage(messageDiv, 'यह स्लॉट अभी-अभी लिया गया। कृपया कोई अन्य स्लॉट आज़माएँ।', 'error');
             } else {
-                 displayMessage(messageDiv, 'कोई अज्ञात त्रुटि हुई या आप पहले से ही एक स्लॉट में हैं।', 'error');
+                 displayMessage(messageDiv, 'कोई अज्ञात त्रुटि हुई।', 'error');
             }
         } catch (error) {
             displayMessage(messageDiv, `स्लॉट से जुड़ने में त्रुटि: ${error.message}`, 'error');
@@ -942,11 +950,11 @@ const app = {
 
 // --- 4. INITIALIZATION ---
 
-// बटन क्लिक पर साउंड अटैच करें
+// DOMContentLoaded के बाद app.init को चलाएँ (Firebase एरर फिक्स)
 document.addEventListener('DOMContentLoaded', () => {
-    // app.init को DOMContentLoaded के बाद चलाएँ ताकि Firebase लाइब्रेरी लोड हो जाए
     app.init(); 
 
+    // बटन क्लिक पर साउंड अटैच करें
     document.querySelectorAll('button:not([onclick^="app.showPage"]), a[onclick], button[onclick]').forEach(element => {
         const originalOnClick = element.getAttribute('onclick');
         if (originalOnClick && !originalOnClick.startsWith('playClickSound()') && !originalOnClick.startsWith('app.showPage')) {
@@ -963,5 +971,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 window.app = app;
-
-
