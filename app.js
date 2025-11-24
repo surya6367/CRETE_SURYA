@@ -1,26 +1,9 @@
-// --- 1. FIREBASE CONFIGURATION ---
-// नोट: यह Firebase कॉन्फ़िगरेशन आपके प्रोजेक्ट के अनुसार है।
-const firebaseConfig = {
-    apiKey: "AIzaSyBQM0KrwvcsUckhJArkvAhPMD1_n_ytuoM",
-    authDomain: "freefiretournament-5d4f5.firebaseapp.com",
-    projectId: "freefiretournament-5d4f5",
-    storageBucket: "freefiretournament-5d4f5.firebasestorage.app",
-    messagingSenderId: "80370183123",
-    appId: "1:80370183123:web:6e56e89b67b7ff87551d26",
-    databaseURL: "https://freefiretournament-5d4f5-default-rtdb.firebaseio.com"
-};
+// www/app.js
 
-// Firebase ऑब्जेक्ट्स को पहले नल (null) पर सेट करें
-let auth = null;
-let db = null;
-let appInstance = null;
-
-
-// --- 2. GLOBAL STATE AND CONSTANTS ---
-// एडमिन ईमेल (मैच बनाने/हटाने और परिणाम सबमिट करने के लिए)
+// Admin Email (Hardcoded requirement)
 const ADMIN_EMAIL = 'sf636785@gmail.com';
 
-// ग्लोबल स्टेट वैरियेबल्स
+// Global State
 let isAdmin = false;
 let currentMode = '';
 let currentMatchId = '';
@@ -28,16 +11,13 @@ let matchIntervals = {};
 let currentUser = null;
 let currentMatchData = null; 
 
-// स्कोर कॉन्फ़िगरेशन (लीडरबोर्ड के लिए)
-const POINTS_PER_WIN = 10;
-const POINTS_PER_KILL = 1;
-
-// साउंड सेटअप (सुनिश्चित करें कि 'sounds' फ़ोल्डर में आवश्यक फ़ाइलें हैं)
+// 1. SOUND FIX: Try .wav files first for better reliability, then fallback to .mp3.
+// NOTE: Ensure your files are named click.wav, warning.wav, beep.wav (or .mp3) in the 'www/sounds' folder.
 const clickSound = new Audio('sounds/click.wav'); 
 const warningSound = new Audio('sounds/warning.wav');
 const criticalSound = new Audio('sounds/beep.wav'); 
 
-// ऑडियो फ़ाइलों के लिए फ़ॉलबैक लॉजिक
+// Fallback logic if .wav files fail to load
 clickSound.onerror = () => { 
     if(clickSound.src.includes('.wav')) {
         clickSound.src = 'sounds/click.mp3'; 
@@ -49,7 +29,7 @@ warningSound.onerror = () => {
     if(warningSound.src.includes('.wav')) {
         warningSound.src = 'sounds/warning.mp3'; 
         console.log("Using warning.mp3 fallback."); 
-        clickSound.onerror = () => console.error("FATAL: warning.mp3 also failed to load.");
+        warningSound.onerror = () => console.error("FATAL: warning.mp3 also failed to load.");
     }
 };
 criticalSound.onerror = () => { 
@@ -63,7 +43,7 @@ criticalSound.onerror = () => {
 function playSound(audioElement) {
     if (audioElement && (audioElement.src.includes('sounds/'))) {
         audioElement.currentTime = 0;
-        // ब्राउज़र ऑटोप्ले नीतियों के कारण त्रुटियों को पकड़ते हुए ऑडियो चलाने का प्रयास
+        // Attempting to play, catching the error if the browser blocks autoplay
         audioElement.play().catch(e => {
              console.error(`Audio play failed for ${audioElement.src.split('/').pop()}: Browser Autoplay Policy blocked it.`, e.message);
         });
@@ -94,68 +74,18 @@ function getSlotLimit(mode) {
     }
 }
 
-// UI संदेशों के लिए सहायक फ़ंक्शन
+// Helper for UI messages
 function displayMessage(element, message, type) {
     element.textContent = message;
     element.className = `message ${type}`;
     element.classList.remove('hidden');
-    const duration = type === 'click-feedback' ? 500 : 5000;
-    setTimeout(() => { element.classList.add('hidden'); }, duration);
+    setTimeout(() => { element.classList.add('hidden'); }, 5000);
 }
 
-// --- 3. APPLICATION LOGIC ---
+// --- Page Navigation and Click Sound ---
 const app = {
-    // FIX 1: सुरक्षित Firebase इनिशियलाइज़ेशन
-    init: () => {
-        // यह जांचें कि 'firebase' ऑब्जेक्ट परिभाषित है या नहीं
-        if (typeof firebase === 'undefined' || typeof firebase.initializeApp === 'undefined') {
-             console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
-             document.getElementById('loadingPage').innerHTML = '<h2>त्रुटि: Firebase लाइब्रेरी लोड नहीं हुई। index.html जांचें।</h2>';
-             return;
-        }
-
-        try {
-            // Firebase को इनिशियलाइज़ करें
-            appInstance = firebase.initializeApp(firebaseConfig);
-            auth = firebase.auth();
-            db = firebase.database();
-            
-            console.log("Firebase initialized successfully.");
-
-            // Auth State Listener को यहाँ से शुरू करें
-            auth.onAuthStateChanged(user => {
-                const loadingPage = document.getElementById('loadingPage');
-                const mainContainer = document.getElementById('mainContainer');
-                
-                // लोडिंग पेज हटाएँ और मेन कंटेनर दिखाएँ
-                loadingPage.classList.add('hidden'); 
-                mainContainer.classList.remove('hidden'); 
-
-                if (user) {
-                    currentUser = user;
-                    isAdmin = (user.email === ADMIN_EMAIL);
-                    document.getElementById('welcomeUser').textContent = `स्वागत है, ${user.email.split('@')[0]}!`;
-                    
-                    db.ref(`users/${user.uid}/ffUid`).once('value', (snapshot) => {
-                        currentUser.ffUid = snapshot.val();
-                        app.showPage('dashboardPage');
-                    });
-
-                } else {
-                    currentUser = null;
-                    isAdmin = false;
-                    app.showPage('welcomePage');
-                }
-            });
-
-        } catch (error) {
-            console.error("FATAL ERROR: Firebase Initialization Failed.", error);
-            document.getElementById('loadingPage').innerHTML = '<h2>त्रुटि: Firebase शुरू करने में विफल रहा। कंसोल देखें।</h2>';
-        }
-        
-    },
-
     showPage: (pageId) => {
+        playClickSound(); 
         document.querySelectorAll('.page').forEach(page => {
             page.classList.remove('active');
             page.classList.add('hidden');
@@ -166,9 +96,6 @@ const app = {
         if (pageId === 'dashboardPage') {
             app.updateAdminPanelVisibility();
             app.renderAdminMatches();
-            app.renderAdminResultSelect(); 
-        } else if (pageId === 'leaderboardPage') {
-            app.renderLeaderboard();
         }
     },
 
@@ -181,15 +108,15 @@ const app = {
         messageDiv.classList.add('hidden');
 
         if (!email || password.length < 6) {
-            displayMessage(messageDiv, 'मान्य ईमेल और पासवर्ड (न्यूनतम 6 वर्ण) दर्ज करें।', 'error');
+            displayMessage(messageDiv, 'Enter valid email and password (min 6 chars).', 'error');
             return;
         }
 
         try {
             await auth.createUserWithEmailAndPassword(email, password);
-            displayMessage(messageDiv, 'अकाउंट सफलतापूर्वक बनाया गया! लॉग इन हो रहा है...', 'success');
+            displayMessage(messageDiv, 'Account created successfully! Logging in...', 'success');
         } catch (error) {
-            displayMessage(messageDiv, `त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error: ${error.message}`, 'error');
         }
     },
     loginUser: async () => { 
@@ -201,9 +128,9 @@ const app = {
 
         try {
             await auth.signInWithEmailAndPassword(email, password);
-            displayMessage(messageDiv, 'सफलतापूर्वक लॉग इन किया गया!', 'success');
+            displayMessage(messageDiv, 'Logged in successfully!', 'success');
         } catch (error) {
-            displayMessage(messageDiv, `त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error: ${error.message}`, 'error');
         }
     },
     logoutUser: async () => { 
@@ -223,46 +150,18 @@ const app = {
         messageDiv.classList.add('hidden');
 
         if (!email) {
-            displayMessage(messageDiv, 'पहले लॉगिन फ़ील्ड में अपना ईमेल दर्ज करें।', 'error');
+            displayMessage(messageDiv, 'Enter your email in the login field first.', 'error');
             return;
         }
 
         try {
             await auth.sendPasswordResetEmail(email);
-            displayMessage(messageDiv, `पासवर्ड रीसेट लिंक ${email} पर भेजा गया। अपना इनबॉक्स जांचें।`, 'success');
+            displayMessage(messageDiv, `Password reset link sent to ${email}. Check your inbox.`, 'success');
         } catch (error) {
-            displayMessage(messageDiv, `त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error: ${error.message}`, 'error');
         }
     },
 
-    // FF UID को सहेजने का फ़ंक्शन
-    saveFFUid: async () => {
-        playClickSound();
-        const ffUidInput = document.getElementById('ffUidInput');
-        const uidToSave = ffUidInput.value.trim();
-        const messageDiv = document.getElementById('ffUidMessage');
-        messageDiv.classList.add('hidden');
-
-        if (!uidToSave || uidToSave.length < 5 || isNaN(uidToSave)) { 
-             displayMessage(messageDiv, 'कृपया एक मान्य Free Fire UID (केवल अंक) दर्ज करें।', 'error');
-             return;
-        }
-        
-        try {
-             await db.ref(`users/${currentUser.uid}/ffUid`).set(uidToSave);
-             currentUser.ffUid = uidToSave; 
-             displayMessage(messageDiv, 'Free Fire UID सफलतापूर्वक सहेजा गया!', 'success');
-             
-             if (document.getElementById('slotPage').classList.contains('active')) {
-                 app.listenForSlots(currentMode, currentMatchId);
-             }
-
-        } catch (error) {
-             displayMessage(messageDiv, `UID सहेजने में त्रुटि: ${error.message}`, 'error');
-             console.error("UID save error:", error);
-        }
-    },
-    
     // --- Admin Functions ---
     updateAdminPanelVisibility: () => {
         const adminPanel = document.getElementById('adminPanel');
@@ -285,7 +184,7 @@ const app = {
         messageDiv.classList.add('hidden');
 
         if (!mode || !roomId || !roomPass || !startTimeStr) {
-            displayMessage(messageDiv, 'कृपया मैच के सभी विवरण भरें।', 'error');
+            displayMessage(messageDiv, 'Please fill all match details.', 'error');
             return;
         }
 
@@ -302,118 +201,15 @@ const app = {
                 maxSlots: maxSlots,
                 slots: {}
             });
-            displayMessage(messageDiv, 'नया मैच सफलतापूर्वक बनाया गया!', 'success');
+            displayMessage(messageDiv, 'New match created successfully!', 'success');
             document.getElementById('adminRoomId').value = '';
             document.getElementById('adminRoomPass').value = '';
             document.getElementById('adminMatchStartTime').value = '';
-            app.renderAdminResultSelect(); 
         } catch (error) {
-            displayMessage(messageDiv, `मैच बनाने में त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error creating match: ${error.message}`, 'error');
         }
     },
     
-    // एडमिन के लिए सक्रिय मैचों को रिजल्ट सबमिशन ड्रॉपडाउन में रेंडर करें
-    renderAdminResultSelect: () => {
-        if (!isAdmin) return;
-        
-        const selectElement = document.getElementById('adminResultMatchSelect');
-        selectElement.innerHTML = '<option value="">-- परिणाम दर्ज करने के लिए मैच चुनें --</option>';
-
-        db.ref('matches').once('value', (snapshot) => {
-            snapshot.forEach(modeSnap => {
-                const mode = modeSnap.key;
-                modeSnap.forEach(matchSnap => {
-                    const match = matchSnap.val();
-                    const matchId = matchSnap.key;
-                    if (!match.result) { 
-                        const option = document.createElement('option');
-                        option.value = `${mode}|${matchId}`; 
-                        option.textContent = `${match.name} (${mode.toUpperCase()}) - ${new Date(match.startTime).toLocaleTimeString()}`;
-                        selectElement.appendChild(option);
-                    }
-                });
-            });
-        });
-    },
-
-    // मैच परिणाम सबमिट करने का फ़ंक्शन
-    submitMatchResult: async () => {
-        playClickSound();
-        if (!isAdmin) return;
-        
-        const selectValue = document.getElementById('adminResultMatchSelect').value;
-        const winnerUid = document.getElementById('resultWinnerUid').value.trim();
-        const killsInput = document.getElementById('resultWinnerKills').value;
-        const messageDiv = document.getElementById('adminResultMessage');
-        messageDiv.classList.add('hidden');
-
-        if (!selectValue || !winnerUid || killsInput === "") {
-            displayMessage(messageDiv, 'कृपया मैच चुनें, विजेता UID और किल्स दर्ज करें।', 'error');
-            return;
-        }
-        
-        const [mode, matchId] = selectValue.split('|');
-        const kills = parseInt(killsInput);
-        
-        if (isNaN(kills) || kills < 0) {
-            displayMessage(messageDiv, 'किल्स एक गैर-नकारात्मक संख्या होनी चाहिए।', 'error');
-            return;
-        }
-
-        try {
-            // 1. मैच ऑब्जेक्ट में परिणाम सहेजें
-            await db.ref(`matches/${mode}/${matchId}/result`).set({
-                winnerUid: winnerUid,
-                kills: kills,
-                points: POINTS_PER_WIN + (kills * POINTS_PER_KILL),
-                submittedAt: Date.now(),
-                submittedBy: currentUser.email.split('@')[0]
-            });
-            
-            // 2. लीडरबोर्ड को अपडेट करें
-            await app.updateLeaderboard(winnerUid, kills);
-            
-            displayMessage(messageDiv, `परिणाम सफलतापूर्वक सबमिट किए गए और लीडरबोर्ड अपडेट हुआ!`, 'success');
-            
-            // इनपुट साफ़ करें और ड्रॉपडाउन रीफ़्रेश करें
-            document.getElementById('adminResultMatchSelect').value = '';
-            document.getElementById('resultWinnerUid').value = '';
-            document.getElementById('resultWinnerKills').value = '';
-            app.renderAdminResultSelect(); 
-            
-        } catch (error) {
-            displayMessage(messageDiv, `परिणाम सबमिट करने में त्रुटि: ${error.message}`, 'error');
-            console.error("Result submission error:", error);
-        }
-    },
-
-    // लीडरबोर्ड डेटा को अपडेट/इंक्रीमेंट करें
-    updateLeaderboard: async (winnerUid, kills) => {
-        const leaderboardRef = db.ref(`leaderboard/${winnerUid}`);
-        const pointsEarned = POINTS_PER_WIN + (kills * POINTS_PER_KILL);
-
-        try {
-             await leaderboardRef.transaction(currentStats => {
-                 if (currentStats === null) {
-                     return {
-                         ffUid: winnerUid,
-                         wins: 1,
-                         totalKills: kills,
-                         totalPoints: pointsEarned,
-                     };
-                 } else {
-                     currentStats.wins = (currentStats.wins || 0) + 1;
-                     currentStats.totalKills = (currentStats.totalKills || 0) + kills;
-                     currentStats.totalPoints = (currentStats.totalPoints || 0) + pointsEarned;
-                     return currentStats;
-                 }
-             });
-        } catch (error) {
-            console.error("Leaderboard transaction failed:", error);
-        }
-    },
-
-    // एडमिन के लिए सक्रिय मैचों को रेंडर करें
     renderAdminMatches: () => {
         if (!isAdmin) return;
 
@@ -431,17 +227,14 @@ const app = {
 
             allMatches.sort((a, b) => a.startTime - b.startTime).forEach(match => {
                 const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const hasResult = !!match.result;
-                const resultText = hasResult ? ` (विजेता: ${match.result.winnerUid})` : '';
-
                 const div = document.createElement('div');
                 div.className = 'admin-match-item';
                 div.innerHTML = `
-                    <span>${match.mode} • ${match.name} (${matchTime}) ${resultText}</span>
+                    <span>${match.mode} • ${match.name} (${matchTime})</span>
                     <div>
-                        <button class="admin-details-btn" onclick="app.viewAdminSlotDetails('${match.mode}', '${match.id}');">विवरण देखें</button>
-                        <button onclick="app.deleteMatch('${match.mode}', '${match.id}', true);">हटाएँ</button>
-                        <button onclick="app.clearSlots('${match.mode}', '${match.id}');">स्लॉट्स खाली करें</button>
+                        <button class="admin-details-btn" onclick="app.viewAdminSlotDetails('${match.mode}', '${match.id}');">View Details</button>
+                        <button onclick="app.deleteMatch('${match.mode}', '${match.id}', true);">Delete</button>
+                        <button onclick="app.clearSlots('${match.mode}', '${match.id}');">Clear Slots</button>
                     </div>
                 `;
                 matchesContainer.appendChild(div);
@@ -459,10 +252,10 @@ const app = {
             if (!match) return;
 
             const slots = match.slots || {};
-            let detailsHtml = `<h3>${match.name} - रूम जानकारी</h3>`;
+            let detailsHtml = `<h3>${match.name} - Room Info</h3>`;
             detailsHtml += `<p><strong>ID:</strong> ${match.roomId}</p>`;
             detailsHtml += `<p><strong>Pass:</strong> ${match.roomPass}</p>`;
-            detailsHtml += `<h3>स्लॉट्स (${Object.keys(slots).length}/${match.maxSlots})</h3>`;
+            detailsHtml += `<h3>Slots (${Object.keys(slots).length}/${match.maxSlots})</h3>`;
             
             db.ref('users').once('value', (userSnap) => {
                 let userDetailsHtml = '<ul style="list-style: none; padding: 0;">';
@@ -474,28 +267,29 @@ const app = {
                         const ffUid = slotData.ffUid || 'N/A'; 
 
                         userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
-                            <strong>स्लॉट ${i}:</strong> ${slotData.email.split('@')[0]}
+                            <strong>Slot ${i}:</strong> ${slotData.email.split('@')[0]}
                             <br>
                             <span style="color: var(--success-green); font-size: 0.9em; margin-left: 10px;">FF UID: ${ffUid}</span>
                         </li>`;
                     } else {
                          userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
-                            <strong>स्लॉट ${i}:</strong> खाली
+                            <strong>Slot ${i}:</strong> FREE
                         </li>`;
                     }
                 }
                 userDetailsHtml += '</ul>';
 
-                alert(`एडमिन मैच विवरण:\n\nमैच: ${match.name}\nरूम ID: ${match.roomId}\nरूम Pass: ${match.roomPass}\n\nSLOTS:\n${userDetailsHtml.replace(/<[^>]*>?/gm, '\n').replace(/&nbsp;/g, ' ').trim()}`);
+                alert(`Admin Match Details:\n\nMatch: ${match.name}\nRoom ID: ${match.roomId}\nRoom Pass: ${match.roomPass}\n\nSLOTS:\n${userDetailsHtml.replace(/<[^>]*>?/gm, '\n').replace(/&nbsp;/g, ' ').trim()}`);
             });
         });
     },
 
+    // Delete function modified to handle both admin manual delete (with confirm) and auto-delete (without confirm)
     deleteMatch: async (mode, matchId, isManual = false) => {
         playClickSound(); 
-        if (!isAdmin && isManual) return; 
+        if (!isAdmin && isManual) return; // Non-admin cannot manually delete
 
-        if (isManual && !confirm('क्या आप वाकई इस मैच को हटाना चाहते हैं?')) return;
+        if (isManual && !confirm('Are you sure you want to delete this match?')) return;
         
         try {
             if (matchIntervals[matchId]) {
@@ -504,7 +298,6 @@ const app = {
             }
             await db.ref(`matches/${mode}/${matchId}`).remove();
             console.log(`Match ${matchId} deleted.`);
-            app.renderAdminResultSelect(); 
         } catch (error) {
             console.error("Deletion error:", error);
         }
@@ -512,7 +305,7 @@ const app = {
 
     clearSlots: async (mode, matchId) => {
          playClickSound(); 
-         if (!isAdmin || !confirm('क्या आप वाकई इस मैच के सभी स्लॉट्स खाली करना चाहते हैं?')) return;
+         if (!isAdmin || !confirm('Are you sure you want to clear ALL slots for this match?')) return;
          try {
              await db.ref(`matches/${mode}/${matchId}/slots`).set({});
              console.log(`Slots for match ${matchId} cleared manually.`);
@@ -525,15 +318,16 @@ const app = {
     selectMode: (mode) => {
         playClickSound();
         currentMode = mode;
-        document.getElementById('matchListTitle').textContent = `मैच ${mode.toUpperCase()} के लिए`;
+        document.getElementById('matchListTitle').textContent = `Matches for ${mode.toUpperCase()}`;
         app.showPage('matchListPage');
         app.listenForMatches(mode);
     },
     
-    // मैच टाइमर और साउंड लॉजिक
+    // Timer Update & Auto-Delete Logic
     updateMatchTimer: (matchId, matchData, mode) => {
         const now = Date.now();
         const startTime = matchData.startTime;
+        // Auto-Delete is 40 seconds after start time
         const deleteTime = startTime + 40000; 
         
         const timeDiffSeconds = Math.floor((startTime - now) / 1000);
@@ -548,27 +342,25 @@ const app = {
         const isCurrentlyViewing = (matchId === currentMatchId && document.getElementById('slotPage').classList.contains('active'));
         const matchContainer = document.getElementById('mainContainer');
         const matchDetailsElement = document.getElementById('currentMatchDetails');
-        const slotTimerElement = document.getElementById('slotPageTimer'); 
-
-        let timeString;
-        let isMatchStarted = (timeDiffSeconds <= 0);
+        const slotTimerElement = document.getElementById('slotPageTimer'); // New element for slot page timer
 
         if (timeDiffSeconds > 0) {
-            // आगामी मैच
+            // Upcoming Match
             const days = Math.floor(timeDiffSeconds / 86400);
             const hours = Math.floor((timeDiffSeconds % 86400) / 3600);
             const minutes = Math.floor((timeDiffSeconds % 3600) / 60);
             const seconds = timeDiffSeconds % 60;
             
-            timeString = `${days > 0 ? days + 'd ' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const timeString = `${days > 0 ? days + 'd ' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             
             timerSpan.textContent = timeString;
+            // 2. FIX: Update slot page timer display
             if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeString;
 
-            statusSpan.textContent = 'आगामी';
+            statusSpan.textContent = 'Upcoming';
             statusSpan.className = 'status upcoming';
 
-            // 59 सेकंड से 2 सेकंड तक काउंटडाउन साउंड
+            // 1 Minute Warning (60 seconds)
             if (isCurrentlyViewing) {
                 if (timeDiffSeconds === 60) {
                     playWarningSound(); 
@@ -578,13 +370,8 @@ const app = {
                     matchDetailsElement.classList.remove('critical-warning'); 
                     matchContainer.classList.remove('screen-shake');
                 }
-                
-                // 59 सेकंड से 2 सेकंड तक हर सेकंड साउंड
-                if (timeDiffSeconds <= 59 && timeDiffSeconds >= 2) {
-                    playWarningSound();
-                }
 
-                // 1 सेकंड पर क्रिटिकल साउंड
+                // 1 Second Warning (Critical Sound and Screen Shake)
                 if (timeDiffSeconds === 1) {
                     playCriticalSound(); 
                     matchDetailsElement.classList.add('critical-warning'); 
@@ -594,48 +381,54 @@ const app = {
 
 
         } else if (timeToDeleteSeconds > 0) {
-            // लाइव मैच
+            // Live Match (Ends after 30 seconds, deletes after 40 seconds)
             const liveTime = 30 + timeDiffSeconds; 
             
-            
+            let timeText;
             if (liveTime > 0) {
-                timeString = `लाइव - खाली होने में ${liveTime} सेकंड`;
+                // First 30 seconds: LIVE, countdown to slot clear
+                timeText = `LIVE - ${liveTime}s to Clear`;
             } else {
-                timeString = `समाप्त - ${timeToDeleteSeconds} सेकंड में हटाया जा रहा है`;
+                 // Next 10 seconds: ENDED, countdown to match deletion
+                timeText = `ENDED - Deleting in ${timeToDeleteSeconds}s`;
             }
             
-            timerSpan.textContent = timeString;
-            if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeString;
+            timerSpan.textContent = timeText;
+             // 2. FIX: Update slot page timer display
+            if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeText;
 
-            statusSpan.textContent = 'लाइव';
+            statusSpan.textContent = 'LIVE';
             statusSpan.className = 'status live';
             
+            // Room Reveal
             if(isCurrentlyViewing) {
+                 app.revealRoomInfo(matchData.roomId, matchData.roomPass);
+
                  if (timeDiffSeconds === 0) {
-                     playCriticalSound(); // रूम ID रिवील होने पर क्रिटिकल साउंड
                      const msg = document.createElement('div');
                      msg.className = 'match-starting-message';
-                     msg.textContent = 'मैच अभी शुरू हो रहा है!';
+                     msg.textContent = 'MATCH STARTING NOW!';
                      document.body.appendChild(msg);
                      setTimeout(() => msg.remove(), 2000);
                  }
+                 // Remove all warnings once match starts
                  matchDetailsElement.classList.remove('warning-animation', 'critical-warning');
                  matchContainer.classList.remove('screen-shake');
             }
 
             if (liveTime === 0) {
-                // 30 सेकंड बाद स्लॉट्स खाली करें
+                // Slot Clear Logic (executed at t = +30s)
                 db.ref(`matches/${mode}/${matchId}/slots`).set({});
                 console.log(`Match ${matchId} slots auto-cleared.`);
             }
 
 
         } else {
-            // मैच समाप्त - ऑटो-डिलीट
-            app.deleteMatch(mode, matchId); 
+            // Match Ended (and timeToDeleteSeconds <= 0) - AUTO-DELETE
+            app.deleteMatch(mode, matchId); // Auto-delete without prompt
             
-            timerSpan.textContent = 'हटाया गया';
-            statusSpan.textContent = 'हटाया गया';
+            timerSpan.textContent = 'DELETED';
+            statusSpan.textContent = 'DELETED';
             statusSpan.className = 'status ended';
             
             if(matchIntervals[matchId]) {
@@ -645,13 +438,15 @@ const app = {
         }
     },
     
+    // Slot Flow Fix: Correctly return to Match List
     backToMatchList: () => {
         playClickSound();
         if (currentMatchId && currentMode) {
-             db.ref(`matches/${currentMode}/${currentMatchId}`).off(); 
+             db.ref(`matches/${currentMode}/${currentMatchId}`).off(); // Stop listening to the match
         }
         app.showPage('matchListPage'); 
         
+        // Reset warnings and room info
         app.revealRoomInfo('********', '********');
         document.getElementById('currentMatchDetails').classList.remove('warning-animation', 'critical-warning');
         document.getElementById('mainContainer').classList.remove('screen-shake');
@@ -668,20 +463,18 @@ const app = {
         currentMode = mode;
         
         db.ref(`users/${currentUser.uid}/ffUid`).once('value', (snapshot) => {
-            currentUser.ffUid = snapshot.val(); 
+            currentUser.ffUid = snapshot.val(); // Load saved UID
             app.showPage('slotPage');
             app.listenForSlots(mode, matchId); 
-            app.revealRoomInfo('********', '********');
         });
     },
 
-    // रूम ID रिवील फिक्स और UID प्रोटेक्शन यहीं होता है
     listenForSlots: (mode, matchId) => {
         const matchRef = db.ref(`matches/${mode}/${matchId}`);
         matchRef.on('value', (snapshot) => {
             currentMatchData = snapshot.val(); 
             if (!currentMatchData) {
-                alert('यह मैच एडमिन द्वारा हटा दिया गया है।');
+                alert('This match has been deleted by the admin.');
                 app.backToMatchList(); 
                 return;
             }
@@ -697,6 +490,7 @@ const app = {
             document.getElementById('maxSlots').textContent = maxSlots;
             document.getElementById('slotsCount').textContent = Object.keys(slots).length;
             
+            // Update match timer display
             app.updateMatchTimer(matchId, currentMatchData, mode); 
             
             const userInMatch = Object.values(slots).some(s => s.uid === currentUser.uid);
@@ -705,24 +499,17 @@ const app = {
 
             const ffUidInputSection = document.getElementById('ffUidInputSection');
             const ffUidInput = document.getElementById('ffUidInput');
-            ffUidInput.value = currentUser.ffUid || ''; 
+            ffUidInput.value = currentUser.ffUid || ''; // Pre-fill saved UID if exists
             
-            // UID इनपुट दिखाएँ/छिपाएँ
+            // 3. FF UID Flexibility: Show input if not in match AND not started
             if (!userInMatch && !isMatchStarted) {
                 ffUidInputSection.classList.remove('hidden');
             } else {
                 ffUidInputSection.classList.add('hidden');
             }
-            
-            // रूम ID/पासवर्ड रिवील लॉजिक (फिक्स किया गया)
-            if (userInMatch && isMatchStarted) {
-                 app.revealRoomInfo(currentMatchData.roomId, currentMatchData.roomPass);
-            } else {
-                 app.revealRoomInfo('********', '********');
-            }
 
 
-            // स्लॉट्स को रेंडर करें
+            // Render Slots
             for (let i = 1; i <= maxSlots; i++) {
                 const slotKey = `slot${i}`;
                 const slotData = slots[slotKey];
@@ -733,37 +520,39 @@ const app = {
                 let button;
                 if (slotData) {
                     div.classList.add('occupied');
-                    div.innerHTML = `<span class="slot-name">स्लॉट ${i}: ${slotData.ffUid} (${slotData.email.split('@')[0]})</span>`;
+                    div.innerHTML = `<span class="slot-name">Slot ${i}: ${slotData.ffUid} (${slotData.email.split('@')[0]})</span>`;
                     
                     if (slotData.uid === currentUser.uid) {
                         button = document.createElement('button');
-                        button.textContent = 'स्लॉट छोड़ें';
+                        button.textContent = 'Leave Slot';
                         button.onclick = () => app.leaveSlot(mode, matchId, slotKey);
                         button.style.backgroundColor = 'var(--warning-red)';
                     } else {
                         button = document.createElement('button');
-                        button.textContent = 'भरा हुआ';
+                        button.textContent = 'Occupied';
                         button.disabled = true;
                     }
                 } else {
-                    div.innerHTML = `<span class="slot-name">स्लॉट ${i}: खाली</span>`;
+                    div.innerHTML = `<span class="slot-name">Slot ${i}: FREE</span>`;
                     
                     button = document.createElement('button');
                     
                     const currentUidInInput = ffUidInput.value;
 
                     if (isMatchStarted) {
-                        button.textContent = 'मैच शुरू';
+                        button.textContent = 'Match Started';
                         button.disabled = true;
                         button.style.backgroundColor = 'var(--warning-red)';
                     } else if (userInMatch) {
-                         button.textContent = 'पहले से जुड़े हुए';
+                         button.textContent = 'Already Joined';
                          button.disabled = true;
                     } else if (!currentUidInInput) {
-                         button.textContent = 'ऊपर UID भरें';
+                         // User has to fill UID above to enable join buttons
+                         button.textContent = 'Fill UID Above';
                          button.disabled = true;
                     } else {
-                         button.textContent = `स्लॉट से जुड़ें`;
+                         // Join using the currently filled UID (saved or temporary)
+                         button.textContent = `Join Slot`;
                          button.disabled = false;
                          button.onclick = () => app.promptAndJoinSlot(mode, matchId, slotKey, currentUidInInput);
                     }
@@ -775,17 +564,19 @@ const app = {
         });
     },
     
+    // Join Slot with Confirmation (Uses the UID passed from the button)
     promptAndJoinSlot: (mode, matchId, slotKey, uidToUse) => {
         playClickSound();
-        const confirmJoin = confirm(`क्या आप FF UID ${uidToUse} के साथ स्लॉट ${slotKey} से जुड़ना चाहते हैं?`);
+        const confirmJoin = confirm(`Are you sure you want to join ${slotKey} with FF UID ${uidToUse}?`);
         
         if (confirmJoin) {
             app.joinSlot(mode, matchId, slotKey, uidToUse);
         } else {
-            displayMessage(document.getElementById('slotPageMessage'), 'स्लॉट में शामिल होना रद्द किया गया।', 'error');
+            displayMessage(document.getElementById('slotPageMessage'), 'Slot joining cancelled.', 'error');
         }
     },
 
+    // Join Slot (Uses the UID passed)
     joinSlot: async (mode, matchId, slotKey, uidToUse) => {
         playClickSound();
         const messageDiv = document.getElementById('slotPageMessage');
@@ -794,28 +585,23 @@ const app = {
         const slotRef = db.ref(`matches/${mode}/${matchId}/slots/${slotKey}`);
         
         try {
-            // UID Protection Check: checks if user is already in ANY slot of this match
-            const isUserAlreadyInSlot = currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid);
-            
-            if (isUserAlreadyInSlot) {
-                 displayMessage(messageDiv, 'आप पहले से ही इस मैच के एक स्लॉट से जुड़े हुए हैं।', 'error');
-                 return; 
-            }
-            
             const result = await slotRef.transaction(currentData => {
                 if (currentData === null) {
+                    if (currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid)) {
+                        return undefined; // Already joined another slot
+                    }
                     
-                    // UID को सहेजें
+                    // Automatically save the new UID if it's different and valid
                     if (uidToUse && uidToUse !== currentUser.ffUid) {
                         db.ref(`users/${currentUser.uid}/ffUid`).set(uidToUse);
-                        currentUser.ffUid = uidToUse; 
-                        document.getElementById('ffUidInput').value = uidToUse; 
+                        currentUser.ffUid = uidToUse; // Update global state
+                        document.getElementById('ffUidInput').value = uidToUse; // Keep the input updated
                     }
                     
                     return { 
                         uid: currentUser.uid, 
                         email: currentUser.email, 
-                        ffUid: uidToUse 
+                        ffUid: uidToUse // Use the dynamic UID
                     };
                 } else {
                     return undefined; 
@@ -823,14 +609,14 @@ const app = {
             });
 
             if (result.committed) {
-                displayMessage(messageDiv, `स्लॉट ${slotKey} से सफलतापूर्वक जुड़े!`, 'success');
+                displayMessage(messageDiv, `Successfully joined ${slotKey}!`, 'success');
             } else if (result.snapshot.val() !== null) {
-                displayMessage(messageDiv, 'यह स्लॉट अभी-अभी लिया गया। कृपया कोई अन्य स्लॉट आज़माएँ।', 'error');
+                displayMessage(messageDiv, 'This slot was just taken. Please try another one.', 'error');
             } else {
-                 displayMessage(messageDiv, 'कोई अज्ञात त्रुटि हुई।', 'error');
+                 displayMessage(messageDiv, 'You have already joined a slot in this match.', 'error');
             }
         } catch (error) {
-            displayMessage(messageDiv, `स्लॉट से जुड़ने में त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error joining slot: ${error.message}`, 'error');
             console.error(error);
         }
     },
@@ -842,58 +628,18 @@ const app = {
         
         try {
             await db.ref(`matches/${mode}/${matchId}/slots/${slotKey}`).remove();
-            displayMessage(messageDiv, 'सफलतापूर्वक स्लॉट छोड़ा।', 'success');
+            displayMessage(messageDiv, 'Successfully left the slot.', 'success');
         } catch (error) {
-            displayMessage(messageDiv, `स्लॉट छोड़ने में त्रुटि: ${error.message}`, 'error');
+            displayMessage(messageDiv, `Error leaving slot: ${error.message}`, 'error');
         }
-    },
-
-    renderLeaderboard: () => {
-        const leaderboardBody = document.getElementById('leaderboardBody');
-        leaderboardBody.innerHTML = '<tr><td colspan="5">लीडरबोर्ड लोड हो रहा है...</td></tr>';
-        
-        db.ref('leaderboard').once('value', (snapshot) => {
-            const stats = [];
-            snapshot.forEach(childSnap => {
-                stats.push(childSnap.val());
-            });
-
-            stats.sort((a, b) => {
-                if (b.totalPoints !== a.totalPoints) {
-                    return b.totalPoints - a.totalPoints;
-                }
-                if (b.wins !== a.wins) {
-                    return b.wins - a.wins;
-                }
-                return b.totalKills - a.totalKills;
-            });
-
-            leaderboardBody.innerHTML = '';
-            
-            if (stats.length === 0) {
-                 leaderboardBody.innerHTML = '<tr><td colspan="5">अभी तक कोई मैच परिणाम सबमिट नहीं किया गया है।</td></tr>';
-                 return;
-            }
-
-            stats.forEach((player, index) => {
-                const rank = index + 1;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>#${rank}</td>
-                    <td>${player.ffUid}</td>
-                    <td>${player.wins}</td>
-                    <td>${player.totalKills}</td>
-                    <td>${player.totalPoints}</td>
-                `;
-                leaderboardBody.appendChild(row);
-            });
-        });
     },
 
     showLeaderboard: () => {
         playClickSound();
         app.showPage('leaderboardPage');
     },
+
+    displayMessage: displayMessage,
 
     listenForMatches: (mode) => {
         Object.values(matchIntervals).forEach(clearInterval);
@@ -920,26 +666,23 @@ const app = {
     renderMatchCard: (match, container) => {
         const div = document.createElement('div');
         div.className = 'match-item';
-
-        const resultStatus = match.result ? `<span style="color: var(--admin-color); font-weight: bold;">(परिणाम: ${match.result.winnerUid})</span>` : '';
-
         div.innerHTML = `
-            <h4>${match.name} ${resultStatus}</h4>
+            <h4>${match.name}</h4>
             <div class="match-details">
-                <span><strong>मोड:</strong> ${match.mode.toUpperCase()}</span>
-                <span><strong>शुरू:</strong> ${new Date(match.startTime).toLocaleString()}</span>
-                <span><strong>स्लॉट्स:</strong> ${Object.keys(match.slots || {}).length}/${match.maxSlots}</span>
-                <span><strong>स्थिति:</strong> <span data-match-status-id="${match.id}" class="status">आगामी</span></span>
-                <span><strong>टाइमर:</strong> <span data-match-timer-id="${match.id}">--:--:--</span></span>
+                <span><strong>Mode:</strong> ${match.mode.toUpperCase()}</span>
+                <span><strong>Start:</strong> ${new Date(match.startTime).toLocaleString()}</span>
+                <span><strong>Slots:</strong> ${Object.keys(match.slots || {}).length}/${match.maxSlots}</span>
+                <span><strong>Status:</strong> <span data-match-status-id="${match.id}" class="status">Upcoming</span></span>
+                <span><strong>Timer:</strong> <span data-match-timer-id="${match.id}">--:--:--</span></span>
             </div>
-            <button onclick="app.joinMatch('${match.id}', '${match.mode}');" style="margin-top: 10px;">देखें और जुड़ें</button>
+            <button onclick="app.joinMatch('${match.id}', '${match.mode}');" style="margin-top: 10px;">View & Join</button>
         `;
         container.appendChild(div);
 
         if (matchIntervals[match.id]) {
             clearInterval(matchIntervals[match.id]);
         }
-        
+        // Timer interval set globally for continuous updates
         matchIntervals[match.id] = setInterval(() => {
             app.updateMatchTimer(match.id, match, match.mode);
         }, 1000);
@@ -948,26 +691,29 @@ const app = {
     }
 };
 
-// --- 4. INITIALIZATION ---
+// --- Firebase Auth State Listener ---
+auth.onAuthStateChanged(user => {
+    const loadingPage = document.getElementById('loadingPage');
+    const mainContainer = document.getElementById('mainContainer');
+    loadingPage.classList.add('hidden'); 
+    mainContainer.classList.remove('hidden'); 
 
-// DOMContentLoaded के बाद app.init को चलाएँ (Firebase एरर फिक्स)
-document.addEventListener('DOMContentLoaded', () => {
-    app.init(); 
+    if (user) {
+        currentUser = user;
+        isAdmin = (user.email === ADMIN_EMAIL);
+        document.getElementById('welcomeUser').textContent = `Welcome, ${user.email.split('@')[0]}!`;
+        
+        // Load saved FF UID on login
+        db.ref(`users/${user.uid}/ffUid`).once('value', (snapshot) => {
+            currentUser.ffUid = snapshot.val();
+            app.showPage('dashboardPage');
+        });
 
-    // बटन क्लिक पर साउंड अटैच करें
-    document.querySelectorAll('button:not([onclick^="app.showPage"]), a[onclick], button[onclick]').forEach(element => {
-        const originalOnClick = element.getAttribute('onclick');
-        if (originalOnClick && !originalOnClick.startsWith('playClickSound()') && !originalOnClick.startsWith('app.showPage')) {
-            element.setAttribute('onclick', `playClickSound(); ${originalOnClick}`);
-        } else if (element.tagName === 'BUTTON' && !originalOnClick) {
-            element.addEventListener('click', playClickSound);
-        }
-    });
-    document.querySelectorAll('[onclick^="app.showPage"]').forEach(element => {
-        const pageId = element.getAttribute('onclick').match(/'([^']+)'/)[1];
-        element.setAttribute('onclick', `playClickSound(); app.showPage('${pageId}');`);
-    });
+    } else {
+        currentUser = null;
+        isAdmin = false;
+        app.showPage('welcomePage');
+    }
 });
-
 
 window.app = app;
