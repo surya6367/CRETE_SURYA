@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SURYA TOURNAMENT</title>
     <link rel="stylesheet" href="styles.css"> 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -38,7 +39,7 @@
             <h2>Signup</h2>
             <input type="email" id="signupEmail" placeholder="Email" required>
             <input type="password" id="signupPassword" placeholder="Password" required>
-            <button onclick="app.signupUser();">Signup</button>
+            <button onclick="app.registerUser();">Signup</button>
             <p><a href="#" onclick="playClickSound(); app.showPage('loginPage');">Already have an account? Login</a></p>
             <div id="signupMessage" class="message hidden"></div>
             <button onclick="playClickSound(); app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
@@ -71,7 +72,15 @@
                     <img src="https://i.postimg.cc/bNPtgxgs/br.jpg" alt="BR48 Mode" class="mode-image">
                 </div>
             </div>
-
+            
+            <div class="social-links">
+                <a href="https://www.youtube.com/@Surya_Gamer999" target="_blank" aria-label="YouTube Channel">
+                    <i class="fab fa-youtube"></i>
+                </a>
+                <a href="https://www.instagram.com/mr_surya620?igsh=MXdheXNtbnEzMWJpZA==" target="_blank" aria-label="Instagram Profile">
+                    <i class="fab fa-instagram"></i>
+                </a>
+            </div>
             <div id="adminPanel" class="hidden">
                 <h3>Admin Controls</h3>
                 <div class="admin-controls">
@@ -85,12 +94,23 @@
                     </select>
                     <input type="text" id="adminRoomId" placeholder="Room ID (e.g., GAME123)" required>
                     <input type="text" id="adminRoomPass" placeholder="Room Password (e.g., SURYA@123)" required>
+                    <input type="text" id="adminMatchName" placeholder="Match Name (e.g., Final 1)" required>
                     <input type="datetime-local" id="adminMatchStartTime" required>
                     <button onclick="app.createMatch();">Create New Match</button>
-                    <div id="adminMatchMessage" class="message hidden"></div>
+                    <div id="adminCreateMessage" class="message hidden"></div>
                 </div>
+                
+                <h4>Result Submission</h4>
+                <div class="admin-controls">
+                    <select id="adminResultMatchSelect"></select>
+                    <input type="text" id="resultWinnerUid" placeholder="Winner FF UID" required>
+                    <input type="number" id="resultWinnerKills" placeholder="Winner Kills (0+)" required>
+                    <button onclick="app.submitMatchResult();">Submit Result</button>
+                    <div id="adminResultMessage" class="message hidden"></div>
+                </div>
+
                 <h4>Active Matches (Admin View)</h4>
-                <div id="adminMatchList" class="match-list"></div>
+                <div id="adminActiveMatches" class="match-list"></div>
             </div>
         </div>
 
@@ -104,13 +124,12 @@
             <h2 id="slotPageMatchTitle">Match Details</h2>
             <div class="match-item" id="currentMatchDetails">
                 <div class="match-details">
-                    <span><strong>Match:</strong> <span id="currentMatchName"></span></span>
-                    <span><strong>Start Time:</strong> <span id="currentMatchStartTime"></span></span>
+                    <span><strong>Match:</strong> <span id="matchNameDisplay"></span> (<span id="matchModeDisplay"></span>)</span>
                     <span><strong>Countdown:</strong> <span id="slotPageTimer">--:--:--</span></span> 
                 </div>
                 <div class="room-info">
-                    <div>Room ID: <span id="revealedRoomId">********</span></div>
-                    <div>Room Pass: <span id="revealedRoomPass">********</span></div>
+                    <div>Room ID: <span id="roomIdDisplay">********</span></div>
+                    <div>Room Pass: <span id="roomPassDisplay">********</span></div>
                 </div>
             </div>
 
@@ -133,17 +152,14 @@
                 <thead>
                     <tr>
                         <th>Rank</th>
-                        <th>Player</th>
+                        <th>Player UID</th>
                         <th>Wins</th>
                         <th>Kills</th>
+                        <th>Points</th>
                     </tr>
                 </thead>
                 <tbody id="leaderboardBody">
-                    <tr><td>1</td><td>ProGamerX</td><td>15</td><td>120</td></tr>
-                    <tr><td>2</td><td>EliteSniper</td><td>12</td><td>95</td></tr>
-                    <tr><td>3</td><td>NoobMaster69</td><td>10</td><td>80</td></tr>
-                    <tr><td>4</td><td>ShadowBlade</td><td>9</td><td>75</td></tr>
-                    <tr><td>5</td><td>ThunderBolt</td><td>8</td><td>70</td></tr>
+                    <tr><td colspan="5">Loading leaderboard...</td></tr>
                 </tbody>
             </table>
             <button onclick="app.showPage('dashboardPage');" style="margin-top: 20px;">Back to Dashboard</button>
@@ -154,7 +170,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     
-    <script src="firebase-setup.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
