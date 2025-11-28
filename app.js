@@ -1,5 +1,63 @@
-// www/app.js
+// --- 1. FIREBASE CONFIGURATION (RESTORED from previous context) ---
+// NOTE: These variables must be defined globally for the rest of the code to work.
+// Ensure your Firebase SDK scripts are loaded in index.html BEFORE app.js.
+const firebaseConfig = {
+    apiKey: "AIzaSyBQM0KrwvcsUckhJArkvAhPMD1_n_ytuoM",
+    authDomain: "freefiretournament-5d4f5.firebaseapp.com",
+    projectId: "freefiretournament-5d4f5",
+    storageBucket: "freefiretournament-5d4f5.firebasestorage.app",
+    messagingSenderId: "80370183123",
+    appId: "1:80370183123:web:6e56e89b67b7ff87551d26",
+    databaseURL: "https://freefiretournament-5d4f5-default-rtdb.firebaseio.com"
+};
 
+// Firebase objects set to null initially
+let auth = null;
+let db = null;
+let appInstance = null;
+
+// Initialize Firebase (This function must be called, usually in a separate script or at DOMContentLoaded)
+const initFirebase = () => {
+    if (typeof firebase === 'undefined' || typeof firebase.initializeApp === 'undefined') {
+         console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
+         document.getElementById('loadingPage').innerHTML = '<h2>Error: Firebase library not loaded. Check index.html.</h2>';
+         return;
+    }
+    try {
+        appInstance = firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.database();
+        console.log("Firebase initialized successfully.");
+
+        // Start Auth State Listener after initialization
+        auth.onAuthStateChanged(user => {
+            const loadingPage = document.getElementById('loadingPage');
+            const mainContainer = document.getElementById('mainContainer');
+            
+            loadingPage.classList.add('hidden'); 
+            mainContainer.classList.remove('hidden'); 
+            if (user) {
+                currentUser = user;
+                isAdmin = (user.email === ADMIN_EMAIL);
+                document.getElementById('welcomeUser').textContent = `Welcome, ${user.email.split('@')[0]}!`;
+                
+                db.ref(`users/${user.uid}/ffUid`).once('value', (snapshot) => {
+                    currentUser.ffUid = snapshot.val();
+                    app.showPage('dashboardPage');
+                });
+            } else {
+                currentUser = null;
+                isAdmin = false;
+                app.showPage('welcomePage');
+            }
+        });
+    } catch (error) {
+        console.error("FATAL ERROR: Firebase Initialization Failed.", error);
+        document.getElementById('loadingPage').innerHTML = '<h2>Error: Firebase Initialization Failed. Check Console.</h2>';
+    }
+};
+
+// --- 2. GLOBAL STATE AND CONSTANTS ---
 // Admin Email (Hardcoded requirement)
 const ADMIN_EMAIL = 'sf636785@gmail.com';
 
@@ -84,6 +142,8 @@ function displayMessage(element, message, type) {
 
 // --- Page Navigation and Click Sound ---
 const app = {
+    // Merged init and showPage logic for simplicity
+    init: initFirebase, 
     showPage: (pageId) => {
         playClickSound(); 
         document.querySelectorAll('.page').forEach(page => {
@@ -96,6 +156,11 @@ const app = {
         if (pageId === 'dashboardPage') {
             app.updateAdminPanelVisibility();
             app.renderAdminMatches();
+            // Assuming renderAdminResultSelect() should also be called here if implemented
+            // app.renderAdminResultSelect(); 
+        } else if (pageId === 'leaderboardPage') {
+            // Assuming renderLeaderboard() should be called here if implemented
+            // app.renderLeaderboard();
         }
     },
 
@@ -125,6 +190,11 @@ const app = {
         const password = document.getElementById('loginPassword').value;
         const messageDiv = document.getElementById('loginMessage');
         messageDiv.classList.add('hidden');
+        
+        if (!email || password.length < 6) {
+            displayMessage(messageDiv, 'Enter valid email and password (min 6 chars).', 'error');
+            return;
+        }
 
         try {
             await auth.signInWithEmailAndPassword(email, password);
@@ -139,6 +209,7 @@ const app = {
             await auth.signOut();
             Object.values(matchIntervals).forEach(clearInterval);
             matchIntervals = {};
+            // The auth listener in initFirebase will handle showPage('welcomePage')
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -162,6 +233,32 @@ const app = {
         }
     },
 
+    // Save FF UID Function
+    saveFFUid: async () => {
+        playClickSound();
+        const ffUidInput = document.getElementById('ffUidInput');
+        const uidToSave = ffUidInput.value.trim();
+        const messageDiv = document.getElementById('ffUidMessage');
+        messageDiv.classList.add('hidden');
+        if (!uidToSave || uidToSave.length < 5 || isNaN(uidToSave)) { 
+             displayMessage(messageDiv, 'Please enter a valid Free Fire UID (digits only).', 'error');
+             return;
+        }
+        
+        try {
+             await db.ref(`users/${currentUser.uid}/ffUid`).set(uidToSave);
+             currentUser.ffUid = uidToSave; 
+             displayMessage(messageDiv, 'Free Fire UID saved successfully!', 'success');
+             
+             if (document.getElementById('slotPage').classList.contains('active')) {
+                 app.listenForSlots(currentMode, currentMatchId);
+             }
+        } catch (error) {
+             displayMessage(messageDiv, `Error saving UID: ${error.message}`, 'error');
+             console.error("UID save error:", error);
+        }
+    },
+
     // --- Admin Functions ---
     updateAdminPanelVisibility: () => {
         const adminPanel = document.getElementById('adminPanel');
@@ -177,13 +274,14 @@ const app = {
         if (!isAdmin) return; 
 
         const mode = document.getElementById('adminMatchMode').value;
-        const roomId = document.getElementById('adminRoomId').value;
-        const roomPass = document.getElementById('adminRoomPass').value;
+        const name = document.getElementById('adminMatchName').value.trim(); // Added match name
+        const roomId = document.getElementById('adminRoomId').value.trim();
+        const roomPass = document.getElementById('adminRoomPass').value.trim();
         const startTimeStr = document.getElementById('adminMatchStartTime').value;
-        const messageDiv = document.getElementById('adminMatchMessage');
+        const messageDiv = document.getElementById('adminCreateMessage');
         messageDiv.classList.add('hidden');
 
-        if (!mode || !roomId || !roomPass || !startTimeStr) {
+        if (!mode || !roomId || !roomPass || !startTimeStr || !name) {
             displayMessage(messageDiv, 'Please fill all match details.', 'error');
             return;
         }
@@ -192,9 +290,14 @@ const app = {
         const startTime = new Date(startTimeStr).getTime(); 
 
         try {
+            // Using push() to get a unique ID and then setting the data
             const newMatchRef = db.ref(`matches/${mode}`).push();
+            const matchId = newMatchRef.key;
+            
             await newMatchRef.set({
-                name: `${mode.toUpperCase()} • Match #${new Date().toLocaleTimeString().split(' ')[0]}`,
+                id: matchId, // Save the ID inside the object for easier access
+                name: name,
+                mode: mode,
                 startTime: startTime,
                 roomId: roomId,
                 roomPass: roomPass,
@@ -204,6 +307,7 @@ const app = {
             displayMessage(messageDiv, 'New match created successfully!', 'success');
             document.getElementById('adminRoomId').value = '';
             document.getElementById('adminRoomPass').value = '';
+            document.getElementById('adminMatchName').value = '';
             document.getElementById('adminMatchStartTime').value = '';
         } catch (error) {
             displayMessage(messageDiv, `Error creating match: ${error.message}`, 'error');
@@ -214,7 +318,7 @@ const app = {
         if (!isAdmin) return;
 
         db.ref('matches').on('value', (snapshot) => {
-            const matchesContainer = document.getElementById('adminMatchList');
+            const matchesContainer = document.getElementById('adminActiveMatches');
             matchesContainer.innerHTML = '';
             const allMatches = [];
 
@@ -304,15 +408,15 @@ const app = {
     },
 
     clearSlots: async (mode, matchId) => {
-         playClickSound(); 
-         if (!isAdmin || !confirm('Are you sure you want to clear ALL slots for this match?')) return;
-         try {
-             await db.ref(`matches/${mode}/${matchId}/slots`).set({});
-             console.log(`Slots for match ${matchId} cleared manually.`);
-         } catch (error) {
-             console.error("Clear slots error:", error);
-         }
-     },
+           playClickSound(); 
+           if (!isAdmin || !confirm('Are you sure you want to clear ALL slots for this match?')) return;
+           try {
+               await db.ref(`matches/${mode}/${matchId}/slots`).set({});
+               console.log(`Slots for match ${matchId} cleared manually.`);
+           } catch (error) {
+               console.error("Clear slots error:", error);
+           }
+    },
 
     // --- User Match & Slot System ---
     selectMode: (mode) => {
@@ -343,6 +447,7 @@ const app = {
         const matchContainer = document.getElementById('mainContainer');
         const matchDetailsElement = document.getElementById('currentMatchDetails');
         const slotTimerElement = document.getElementById('slotPageTimer'); // New element for slot page timer
+        const userInMatch = currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid);
 
         if (timeDiffSeconds > 0) {
             // Upcoming Match
@@ -354,11 +459,16 @@ const app = {
             const timeString = `${days > 0 ? days + 'd ' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             
             timerSpan.textContent = timeString;
-            // 2. FIX: Update slot page timer display
+            // Update slot page timer display
             if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeString;
 
             statusSpan.textContent = 'Upcoming';
             statusSpan.className = 'status upcoming';
+            
+            // Remove room info if time > 0
+            if (isCurrentlyViewing) {
+                 app.revealRoomInfo('********', '********');
+            }
 
             // 1 Minute Warning (60 seconds)
             if (isCurrentlyViewing) {
@@ -394,15 +504,19 @@ const app = {
             }
             
             timerSpan.textContent = timeText;
-             // 2. FIX: Update slot page timer display
+             // Update slot page timer display
             if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeText;
 
             statusSpan.textContent = 'LIVE';
             statusSpan.className = 'status live';
             
-            // Room Reveal
+            // Room Reveal - Only if user is in match
             if(isCurrentlyViewing) {
-                 app.revealRoomInfo(matchData.roomId, matchData.roomPass);
+                if (userInMatch) {
+                   app.revealRoomInfo(matchData.roomId, matchData.roomPass);
+                } else {
+                   app.revealRoomInfo('********', '********');
+                }
 
                  if (timeDiffSeconds === 0) {
                      const msg = document.createElement('div');
@@ -416,7 +530,7 @@ const app = {
                  matchContainer.classList.remove('screen-shake');
             }
 
-            if (liveTime === 0) {
+            if (liveTime === 0 && timeDiffSeconds === -30) {
                 // Slot Clear Logic (executed at t = +30s)
                 db.ref(`matches/${mode}/${matchId}/slots`).set({});
                 console.log(`Match ${matchId} slots auto-cleared.`);
@@ -453,8 +567,8 @@ const app = {
     },
 
     revealRoomInfo: (roomId, roomPass) => {
-        document.getElementById('revealedRoomId').textContent = roomId;
-        document.getElementById('revealedRoomPass').textContent = roomPass;
+        document.getElementById('roomIdDisplay').textContent = roomId;
+        document.getElementById('roomPassDisplay').textContent = roomPass;
     },
 
     joinMatch: (matchId, mode) => {
@@ -479,14 +593,16 @@ const app = {
                 return;
             }
 
+            // Update details displayed on slot page
+            document.getElementById('slotPageMatchTitle').textContent = currentMatchData.name;
+            document.getElementById('matchNameDisplay').textContent = currentMatchData.name;
+            document.getElementById('matchModeDisplay').textContent = currentMatchData.mode.toUpperCase();
+            
             const slots = currentMatchData.slots || {};
             const maxSlots = currentMatchData.maxSlots;
             const slotsContainer = document.getElementById('slotsContainer');
             slotsContainer.innerHTML = '';
-
-            document.getElementById('slotPageMatchTitle').textContent = currentMatchData.name;
-            document.getElementById('currentMatchName').textContent = currentMatchData.name;
-            document.getElementById('currentMatchStartTime').textContent = new Date(currentMatchData.startTime).toLocaleString();
+            
             document.getElementById('maxSlots').textContent = maxSlots;
             document.getElementById('slotsCount').textContent = Object.keys(slots).length;
             
@@ -501,11 +617,18 @@ const app = {
             const ffUidInput = document.getElementById('ffUidInput');
             ffUidInput.value = currentUser.ffUid || ''; // Pre-fill saved UID if exists
             
-            // 3. FF UID Flexibility: Show input if not in match AND not started
+            // FF UID Flexibility: Show input if not in match AND not started
             if (!userInMatch && !isMatchStarted) {
                 ffUidInputSection.classList.remove('hidden');
             } else {
                 ffUidInputSection.classList.add('hidden');
+            }
+            
+            // Room ID/Password Reveal Logic: Handle here too, for immediate update
+            if (userInMatch && isMatchStarted) {
+                app.revealRoomInfo(currentMatchData.roomId, currentMatchData.roomPass);
+            } else {
+                app.revealRoomInfo('********', '********');
             }
 
 
@@ -536,7 +659,6 @@ const app = {
                     div.innerHTML = `<span class="slot-name">Slot ${i}: FREE</span>`;
                     
                     button = document.createElement('button');
-                    
                     const currentUidInInput = ffUidInput.value;
 
                     if (isMatchStarted) {
@@ -636,6 +758,8 @@ const app = {
 
     showLeaderboard: () => {
         playClickSound();
+        // Assume you have a function to render the leaderboard data here
+        // app.renderLeaderboard();
         app.showPage('leaderboardPage');
     },
 
@@ -654,6 +778,10 @@ const app = {
             snapshot.forEach(snap => {
                 matches.push({ id: snap.key, mode: mode, ...snap.val() });
             });
+            
+            if (matches.length === 0) {
+                matchesContainer.innerHTML = '<h4>No matches scheduled for this mode.</h4>';
+            }
 
             matches.sort((a, b) => a.startTime - b.startTime);
 
@@ -691,29 +819,25 @@ const app = {
     }
 };
 
-// --- Firebase Auth State Listener ---
-auth.onAuthStateChanged(user => {
-    const loadingPage = document.getElementById('loadingPage');
-    const mainContainer = document.getElementById('mainContainer');
-    loadingPage.classList.add('hidden'); 
-    mainContainer.classList.remove('hidden'); 
+// --- 4. INITIALIZATION ---
 
-    if (user) {
-        currentUser = user;
-        isAdmin = (user.email === ADMIN_EMAIL);
-        document.getElementById('welcomeUser').textContent = `Welcome, ${user.email.split('@')[0]}!`;
-        
-        // Load saved FF UID on login
-        db.ref(`users/${user.uid}/ffUid`).once('value', (snapshot) => {
-            currentUser.ffUid = snapshot.val();
-            app.showPage('dashboardPage');
-        });
-
-    } else {
-        currentUser = null;
-        isAdmin = false;
-        app.showPage('welcomePage');
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    // Start Firebase Initialization and Auth Listening
+    app.init(); 
+    
+    // Attach sound to buttons globally (after app.init loads everything)
+    document.querySelectorAll('button:not([onclick^="app.showPage"]), a[onclick], button[onclick]').forEach(element => {
+        const originalOnClick = element.getAttribute('onclick');
+        if (originalOnClick && !originalOnClick.startsWith('playClickSound()') && !originalOnClick.startsWith('app.showPage')) {
+            element.setAttribute('onclick', `playClickSound(); ${originalOnClick}`);
+        } else if (element.tagName === 'BUTTON' && !originalOnClick) {
+            element.addEventListener('click', playClickSound);
+        }
+    });
+    document.querySelectorAll('[onclick^="app.showPage"]').forEach(element => {
+        const pageId = element.getAttribute('onclick').match(/'([^']+)'/)[1];
+        element.setAttribute('onclick', `playClickSound(); app.showPage('${pageId}');`);
+    });
 });
 
 window.app = app;
