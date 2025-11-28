@@ -20,8 +20,8 @@
         <div id="welcomePage" class="page active">
             <h1>Welcome to SURYA Tournament</h1>
             <p>Your ultimate gaming battleground!</p>
-            <button onclick="playClickSound(); app.showPage('loginPage');">Login</button>
-            <button onclick="playClickSound(); app.showPage('signupPage');">Signup</button>
+            <button onclick="app.showPage('loginPage');">Login</button>
+            <button onclick="app.showPage('signupPage');">Signup</button>
         </div>
 
         <div id="loginPage" class="page hidden">
@@ -29,20 +29,20 @@
             <input type="email" id="loginEmail" placeholder="Email" required>
             <input type="password" id="loginPassword" placeholder="Password" required>
             <button onclick="app.loginUser();">Login</button>
-            <p><a href="#" onclick="playClickSound(); app.showPage('signupPage');">Don't have an account? Signup</a></p>
+            <p><a href="#" onclick="app.showPage('signupPage');">Don't have an account? Signup</a></p>
             <p><a href="#" onclick="app.resetPassword();">Forgot Password?</a></p>
             <div id="loginMessage" class="message hidden"></div>
-            <button onclick="playClickSound(); app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
+            <button onclick="app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
         </div>
 
         <div id="signupPage" class="page hidden">
             <h2>Signup</h2>
             <input type="email" id="signupEmail" placeholder="Email" required>
             <input type="password" id="signupPassword" placeholder="Password" required>
-            <button onclick="app.registerUser();">Signup</button>
-            <p><a href="#" onclick="playClickSound(); app.showPage('loginPage');">Already have an account? Login</a></p>
+            <button onclick="app.signupUser();">Signup</button>
+            <p><a href="#" onclick="app.showPage('loginPage');">Already have an account? Login</a></p>
             <div id="signupMessage" class="message hidden"></div>
-            <button onclick="playClickSound(); app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
+            <button onclick="app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
         </div>
 
         <div id="dashboardPage" class="page hidden">
@@ -102,7 +102,7 @@
                 
                 <h4>Result Submission</h4>
                 <div class="admin-controls">
-                    <select id="adminResultMatchSelect"></select>
+                    <select id="adminResultMatchSelect"><option value="">-- Select Match to Enter Result --</option></select>
                     <input type="text" id="resultWinnerUid" placeholder="Winner FF UID" required>
                     <input type="number" id="resultWinnerKills" placeholder="Winner Kills (0+)" required>
                     <button onclick="app.submitMatchResult();">Submit Result</button>
