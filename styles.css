@@ -86,6 +86,7 @@ input[type="email"],
 input[type="password"],
 input[type="text"],
 input[type="datetime-local"],
+input[type="number"], /* Added input type number for kills */
 select {
     background-color: var(--darker-bg);
     border: 1px solid var(--border-color);
@@ -103,6 +104,7 @@ input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="text"]:focus,
 input[type="datetime-local"]:focus,
+input[type="number"]:focus, /* Added focus style for number */
 select:focus {
     outline: none;
     border-color: var(--neon-blue);
@@ -356,6 +358,7 @@ select:focus {
     border: 1px dashed var(--neon-purple);
     padding: 20px;
     margin-top: 20px;
+    margin-bottom: 20px; /* Added margin-bottom to separate from social links/footer */
     border-radius: 10px;
 }
 
@@ -423,6 +426,38 @@ select:focus {
     background-color: rgba(0, 255, 255, 0.05);
 }
 
+/* --- ADDED: Social Links Styling --- */
+.social-links {
+    margin: 20px auto 10px auto; /* Increased top margin, reduced bottom margin */
+    padding: 15px;
+    text-align: center;
+    border-top: 1px solid var(--neon-purple); 
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.social-links a {
+    color: var(--text-color); 
+    font-size: 40px;
+    margin: 0 20px;
+    transition: transform 0.3s ease, color 0.3s ease;
+    display: inline-block;
+}
+
+.social-links a:hover {
+    transform: scale(1.15);
+}
+
+.social-links a i.fa-youtube:hover {
+    color: #FF0000; /* YouTube Red */
+}
+
+.social-links a i.fa-instagram:hover {
+    color: #E1306C; /* Instagram Pink/Red */
+}
+/* --- END Social Links Styling --- */
+
+
 /* Responsive */
 @media (max-width: 768px) {
     .container {
@@ -446,6 +481,38 @@ select:focus {
     #dashboardPage .header h2 {
         font-size: 1.5em;
     }
+
+    /* ADDED: Mobile adjustments for match/slot items */
+    .match-item, .slot-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .slot-item button {
+        width: 100%;
+        margin-top: 10px;
+    }
+    .admin-match-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .admin-match-item > div {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 5px;
+    }
+    .admin-match-item button {
+        flex-grow: 1;
+        margin: 2px;
+    }
+    
+    /* ADDED: Social Link sizing for mobile */
+    .social-links a {
+        font-size: 30px;
+        margin: 0 10px;
+    }
+    /* FIX: Closing curly brace for media query */
 }
 
 /* Warning effects */
@@ -512,4 +579,4 @@ select:focus {
     80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
 }
-}
+/* Removed the extra closing curly brace '}' here */
