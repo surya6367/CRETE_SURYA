@@ -1,6 +1,4 @@
-// --- 1. FIREBASE CONFIGURATION (RESTORED from previous context) ---
-// NOTE: These variables must be defined globally for the rest of the code to work.
-// Ensure your Firebase SDK scripts are loaded in index.html BEFORE app.js.
+// --- 1. FIREBASE CONFIGURATION & Initialization Fix ---
 const firebaseConfig = {
     apiKey: "AIzaSyBQM0KrwvcsUckhJArkvAhPMD1_n_ytuoM",
     authDomain: "freefiretournament-5d4f5.firebaseapp.com",
@@ -16,8 +14,9 @@ let auth = null;
 let db = null;
 let appInstance = null;
 
-// Initialize Firebase (This function must be called, usually in a separate script or at DOMContentLoaded)
+// The function that initializes Firebase and handles the loading screen
 const initFirebase = () => {
+    // Check if Firebase SDK is loaded (The main FIX for "Loading...")
     if (typeof firebase === 'undefined' || typeof firebase.initializeApp === 'undefined') {
          console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
          document.getElementById('loadingPage').innerHTML = '<h2>Error: Firebase library not loaded. Check index.html.</h2>';
@@ -34,8 +33,10 @@ const initFirebase = () => {
             const loadingPage = document.getElementById('loadingPage');
             const mainContainer = document.getElementById('mainContainer');
             
+            // This is the line that makes the website advance past the loading screen
             loadingPage.classList.add('hidden'); 
             mainContainer.classList.remove('hidden'); 
+            
             if (user) {
                 currentUser = user;
                 isAdmin = (user.email === ADMIN_EMAIL);
@@ -58,10 +59,7 @@ const initFirebase = () => {
 };
 
 // --- 2. GLOBAL STATE AND CONSTANTS ---
-// Admin Email (Hardcoded requirement)
 const ADMIN_EMAIL = 'sf636785@gmail.com';
-
-// Global State
 let isAdmin = false;
 let currentMode = '';
 let currentMatchId = '';
@@ -69,8 +67,11 @@ let matchIntervals = {};
 let currentUser = null;
 let currentMatchData = null; 
 
-// 1. SOUND FIX: Try .wav files first for better reliability, then fallback to .mp3.
-// NOTE: Ensure your files are named click.wav, warning.wav, beep.wav (or .mp3) in the 'www/sounds' folder.
+// Score Configuration (Assumed from previous context)
+const POINTS_PER_WIN = 10;
+const POINTS_PER_KILL = 1;
+
+// Sound Setup
 const clickSound = new Audio('sounds/click.wav'); 
 const warningSound = new Audio('sounds/warning.wav');
 const criticalSound = new Audio('sounds/beep.wav'); 
@@ -101,24 +102,15 @@ criticalSound.onerror = () => {
 function playSound(audioElement) {
     if (audioElement && (audioElement.src.includes('sounds/'))) {
         audioElement.currentTime = 0;
-        // Attempting to play, catching the error if the browser blocks autoplay
         audioElement.play().catch(e => {
              console.error(`Audio play failed for ${audioElement.src.split('/').pop()}: Browser Autoplay Policy blocked it.`, e.message);
         });
     }
 }
 
-function playClickSound() {
-    playSound(clickSound);
-}
-
-function playWarningSound() {
-    playSound(warningSound);
-}
-
-function playCriticalSound() {
-    playSound(criticalSound);
-}
+function playClickSound() { playSound(clickSound); }
+function playWarningSound() { playSound(warningSound); }
+function playCriticalSound() { playSound(criticalSound); }
 
 
 function getSlotLimit(mode) {
@@ -137,12 +129,13 @@ function displayMessage(element, message, type) {
     element.textContent = message;
     element.className = `message ${type}`;
     element.classList.remove('hidden');
-    setTimeout(() => { element.classList.add('hidden'); }, 5000);
+    // Using a shorter duration for click feedback messages
+    const duration = type === 'click-feedback' ? 500 : 5000;
+    setTimeout(() => { element.classList.add('hidden'); }, duration);
 }
 
-// --- Page Navigation and Click Sound ---
+// --- 3. APPLICATION LOGIC ---
 const app = {
-    // Merged init and showPage logic for simplicity
     init: initFirebase, 
     showPage: (pageId) => {
         playClickSound(); 
@@ -156,11 +149,10 @@ const app = {
         if (pageId === 'dashboardPage') {
             app.updateAdminPanelVisibility();
             app.renderAdminMatches();
-            // Assuming renderAdminResultSelect() should also be called here if implemented
-            // app.renderAdminResultSelect(); 
+            // Assuming renderAdminResultSelect is a necessary function for Admin panel
+            app.renderAdminResultSelect(); 
         } else if (pageId === 'leaderboardPage') {
-            // Assuming renderLeaderboard() should be called here if implemented
-            // app.renderLeaderboard();
+            app.renderLeaderboard();
         }
     },
 
@@ -209,7 +201,6 @@ const app = {
             await auth.signOut();
             Object.values(matchIntervals).forEach(clearInterval);
             matchIntervals = {};
-            // The auth listener in initFirebase will handle showPage('welcomePage')
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -274,7 +265,7 @@ const app = {
         if (!isAdmin) return; 
 
         const mode = document.getElementById('adminMatchMode').value;
-        const name = document.getElementById('adminMatchName').value.trim(); // Added match name
+        const name = document.getElementById('adminMatchName').value.trim();
         const roomId = document.getElementById('adminRoomId').value.trim();
         const roomPass = document.getElementById('adminRoomPass').value.trim();
         const startTimeStr = document.getElementById('adminMatchStartTime').value;
@@ -290,12 +281,11 @@ const app = {
         const startTime = new Date(startTimeStr).getTime(); 
 
         try {
-            // Using push() to get a unique ID and then setting the data
             const newMatchRef = db.ref(`matches/${mode}`).push();
             const matchId = newMatchRef.key;
             
             await newMatchRef.set({
-                id: matchId, // Save the ID inside the object for easier access
+                id: matchId, 
                 name: name,
                 mode: mode,
                 startTime: startTime,
@@ -309,11 +299,154 @@ const app = {
             document.getElementById('adminRoomPass').value = '';
             document.getElementById('adminMatchName').value = '';
             document.getElementById('adminMatchStartTime').value = '';
+            app.renderAdminResultSelect(); // Refresh result dropdown
         } catch (error) {
             displayMessage(messageDiv, `Error creating match: ${error.message}`, 'error');
         }
     },
     
+    // Admin Result Select functionality (Needed for index.html)
+    renderAdminResultSelect: () => {
+        if (!isAdmin) return;
+        
+        const selectElement = document.getElementById('adminResultMatchSelect');
+        selectElement.innerHTML = '<option value="">-- Select Match to Enter Result --</option>';
+        db.ref('matches').once('value', (snapshot) => {
+            snapshot.forEach(modeSnap => {
+                const mode = modeSnap.key;
+                modeSnap.forEach(matchSnap => {
+                    const match = matchSnap.val();
+                    const matchId = matchSnap.key;
+                    // Only show matches without results
+                    if (!match.result) { 
+                        const option = document.createElement('option');
+                        option.value = `${mode}|${matchId}`; 
+                        option.textContent = `${match.name} (${mode.toUpperCase()}) - ${new Date(match.startTime).toLocaleTimeString()}`;
+                        selectElement.appendChild(option);
+                    }
+                });
+            });
+        });
+    },
+
+    // Submit Match Result Function (Needed for index.html)
+    submitMatchResult: async () => {
+        playClickSound();
+        if (!isAdmin) return;
+        
+        const selectValue = document.getElementById('adminResultMatchSelect').value;
+        const winnerUid = document.getElementById('resultWinnerUid').value.trim();
+        const killsInput = document.getElementById('resultWinnerKills').value;
+        const messageDiv = document.getElementById('adminResultMessage');
+        messageDiv.classList.add('hidden');
+        
+        if (!selectValue || !winnerUid || killsInput === "") {
+            displayMessage(messageDiv, 'Please select match, enter winner UID and kills.', 'error');
+            return;
+        }
+        
+        const [mode, matchId] = selectValue.split('|');
+        const kills = parseInt(killsInput);
+        
+        if (isNaN(kills) || kills < 0) {
+            displayMessage(messageDiv, 'Kills must be a non-negative number.', 'error');
+            return;
+        }
+        
+        const pointsEarned = POINTS_PER_WIN + (kills * POINTS_PER_KILL);
+        
+        try {
+            // 1. Save result in the match object
+            await db.ref(`matches/${mode}/${matchId}/result`).set({
+                winnerUid: winnerUid,
+                kills: kills,
+                points: pointsEarned,
+                submittedAt: Date.now(),
+                submittedBy: currentUser.email.split('@')[0]
+            });
+            
+            // 2. Update the Leaderboard
+            await app.updateLeaderboard(winnerUid, kills, pointsEarned);
+            
+            displayMessage(messageDiv, `Results submitted successfully and leaderboard updated!`, 'success');
+            
+            // Clear inputs and refresh dropdown
+            document.getElementById('adminResultMatchSelect').value = '';
+            document.getElementById('resultWinnerUid').value = '';
+            document.getElementById('resultWinnerKills').value = '';
+            app.renderAdminResultSelect(); 
+            
+        } catch (error) {
+            displayMessage(messageDiv, `Error submitting result: ${error.message}`, 'error');
+            console.error("Result submission error:", error);
+        }
+    },
+    
+    // Update/Increment Leaderboard Data
+    updateLeaderboard: async (winnerUid, kills, pointsEarned) => {
+        const leaderboardRef = db.ref(`leaderboard/${winnerUid}`);
+        try {
+             await leaderboardRef.transaction(currentStats => {
+                 if (currentStats === null) {
+                     return {
+                         ffUid: winnerUid,
+                         wins: 1,
+                         totalKills: kills,
+                         totalPoints: pointsEarned,
+                     };
+                 } else {
+                     // Ensure fields exist before incrementing
+                     currentStats.wins = (currentStats.wins || 0) + 1;
+                     currentStats.totalKills = (currentStats.totalKills || 0) + kills;
+                     currentStats.totalPoints = (currentStats.totalPoints || 0) + pointsEarned;
+                     return currentStats;
+                 }
+             });
+        } catch (error) {
+            console.error("Leaderboard transaction failed:", error);
+        }
+    },
+    
+    // Render Leaderboard (Needed for index.html)
+    renderLeaderboard: () => {
+        const leaderboardBody = document.getElementById('leaderboardBody');
+        leaderboardBody.innerHTML = '<tr><td colspan="5">Loading Leaderboard...</td></tr>';
+        
+        db.ref('leaderboard').once('value', (snapshot) => {
+            const stats = [];
+            snapshot.forEach(childSnap => {
+                stats.push(childSnap.val());
+            });
+            
+            // Sort: Points (desc), Wins (desc), Kills (desc)
+            stats.sort((a, b) => {
+                if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                return b.totalKills - a.totalKills;
+            });
+            
+            leaderboardBody.innerHTML = '';
+            
+            if (stats.length === 0) {
+                 leaderboardBody.innerHTML = '<tr><td colspan="5">No match results submitted yet.</td></tr>';
+                 return;
+            }
+            stats.forEach((player, index) => {
+                const rank = index + 1;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>#${rank}</td>
+                    <td>${player.ffUid}</td>
+                    <td>${player.wins}</td>
+                    <td>${player.totalKills}</td>
+                    <td>${player.totalPoints}</td>
+                `;
+                leaderboardBody.appendChild(row);
+            });
+        });
+    },
+
+
     renderAdminMatches: () => {
         if (!isAdmin) return;
 
@@ -388,20 +521,21 @@ const app = {
         });
     },
 
-    // Delete function modified to handle both admin manual delete (with confirm) and auto-delete (without confirm)
     deleteMatch: async (mode, matchId, isManual = false) => {
         playClickSound(); 
-        if (!isAdmin && isManual) return; // Non-admin cannot manually delete
+        if (!isAdmin && isManual) return; 
 
         if (isManual && !confirm('Are you sure you want to delete this match?')) return;
         
         try {
+            // Clear interval if it exists
             if (matchIntervals[matchId]) {
                  clearInterval(matchIntervals[matchId]);
                  delete matchIntervals[matchId];
             }
             await db.ref(`matches/${mode}/${matchId}`).remove();
             console.log(`Match ${matchId} deleted.`);
+            app.renderAdminResultSelect(); // Refresh admin list/dropdown
         } catch (error) {
             console.error("Deletion error:", error);
         }
@@ -431,12 +565,10 @@ const app = {
     updateMatchTimer: (matchId, matchData, mode) => {
         const now = Date.now();
         const startTime = matchData.startTime;
-        // Auto-Delete is 40 seconds after start time
         const deleteTime = startTime + 40000; 
         
         const timeDiffSeconds = Math.floor((startTime - now) / 1000);
         const timeToDeleteSeconds = Math.floor((deleteTime - now) / 1000); 
-
         
         const timerSpan = document.querySelector(`[data-match-timer-id="${matchId}"]`);
         const statusSpan = document.querySelector(`[data-match-status-id="${matchId}"]`);
@@ -446,7 +578,7 @@ const app = {
         const isCurrentlyViewing = (matchId === currentMatchId && document.getElementById('slotPage').classList.contains('active'));
         const matchContainer = document.getElementById('mainContainer');
         const matchDetailsElement = document.getElementById('currentMatchDetails');
-        const slotTimerElement = document.getElementById('slotPageTimer'); // New element for slot page timer
+        const slotTimerElement = document.getElementById('slotPageTimer'); 
         const userInMatch = currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid);
 
         if (timeDiffSeconds > 0) {
@@ -459,13 +591,11 @@ const app = {
             const timeString = `${days > 0 ? days + 'd ' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             
             timerSpan.textContent = timeString;
-            // Update slot page timer display
             if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeString;
 
             statusSpan.textContent = 'Upcoming';
             statusSpan.className = 'status upcoming';
             
-            // Remove room info if time > 0
             if (isCurrentlyViewing) {
                  app.revealRoomInfo('********', '********');
             }
@@ -481,7 +611,6 @@ const app = {
                     matchContainer.classList.remove('screen-shake');
                 }
 
-                // 1 Second Warning (Critical Sound and Screen Shake)
                 if (timeDiffSeconds === 1) {
                     playCriticalSound(); 
                     matchDetailsElement.classList.add('critical-warning'); 
@@ -491,20 +620,17 @@ const app = {
 
 
         } else if (timeToDeleteSeconds > 0) {
-            // Live Match (Ends after 30 seconds, deletes after 40 seconds)
+            // Live Match
             const liveTime = 30 + timeDiffSeconds; 
             
             let timeText;
             if (liveTime > 0) {
-                // First 30 seconds: LIVE, countdown to slot clear
                 timeText = `LIVE - ${liveTime}s to Clear`;
             } else {
-                 // Next 10 seconds: ENDED, countdown to match deletion
                 timeText = `ENDED - Deleting in ${timeToDeleteSeconds}s`;
             }
             
             timerSpan.textContent = timeText;
-             // Update slot page timer display
             if (isCurrentlyViewing && slotTimerElement) slotTimerElement.textContent = timeText;
 
             statusSpan.textContent = 'LIVE';
@@ -525,21 +651,19 @@ const app = {
                      document.body.appendChild(msg);
                      setTimeout(() => msg.remove(), 2000);
                  }
-                 // Remove all warnings once match starts
                  matchDetailsElement.classList.remove('warning-animation', 'critical-warning');
                  matchContainer.classList.remove('screen-shake');
             }
 
             if (liveTime === 0 && timeDiffSeconds === -30) {
-                // Slot Clear Logic (executed at t = +30s)
                 db.ref(`matches/${mode}/${matchId}/slots`).set({});
                 console.log(`Match ${matchId} slots auto-cleared.`);
             }
 
 
         } else {
-            // Match Ended (and timeToDeleteSeconds <= 0) - AUTO-DELETE
-            app.deleteMatch(mode, matchId); // Auto-delete without prompt
+            // Match Ended - AUTO-DELETE
+            app.deleteMatch(mode, matchId); 
             
             timerSpan.textContent = 'DELETED';
             statusSpan.textContent = 'DELETED';
@@ -552,15 +676,13 @@ const app = {
         }
     },
     
-    // Slot Flow Fix: Correctly return to Match List
     backToMatchList: () => {
         playClickSound();
         if (currentMatchId && currentMode) {
-             db.ref(`matches/${currentMode}/${currentMatchId}`).off(); // Stop listening to the match
+             db.ref(`matches/${currentMode}/${currentMatchId}`).off();
         }
         app.showPage('matchListPage'); 
         
-        // Reset warnings and room info
         app.revealRoomInfo('********', '********');
         document.getElementById('currentMatchDetails').classList.remove('warning-animation', 'critical-warning');
         document.getElementById('mainContainer').classList.remove('screen-shake');
@@ -577,7 +699,7 @@ const app = {
         currentMode = mode;
         
         db.ref(`users/${currentUser.uid}/ffUid`).once('value', (snapshot) => {
-            currentUser.ffUid = snapshot.val(); // Load saved UID
+            currentUser.ffUid = snapshot.val(); 
             app.showPage('slotPage');
             app.listenForSlots(mode, matchId); 
         });
@@ -593,7 +715,6 @@ const app = {
                 return;
             }
 
-            // Update details displayed on slot page
             document.getElementById('slotPageMatchTitle').textContent = currentMatchData.name;
             document.getElementById('matchNameDisplay').textContent = currentMatchData.name;
             document.getElementById('matchModeDisplay').textContent = currentMatchData.mode.toUpperCase();
@@ -606,25 +727,21 @@ const app = {
             document.getElementById('maxSlots').textContent = maxSlots;
             document.getElementById('slotsCount').textContent = Object.keys(slots).length;
             
-            // Update match timer display
             app.updateMatchTimer(matchId, currentMatchData, mode); 
             
             const userInMatch = Object.values(slots).some(s => s.uid === currentUser.uid);
-            const timeDiffSeconds = Math.floor((currentMatchData.startTime - Date.now()) / 1000);
-            const isMatchStarted = (timeDiffSeconds <= 0);
+            const isMatchStarted = (currentMatchData.startTime - Date.now() <= 0);
 
             const ffUidInputSection = document.getElementById('ffUidInputSection');
             const ffUidInput = document.getElementById('ffUidInput');
-            ffUidInput.value = currentUser.ffUid || ''; // Pre-fill saved UID if exists
+            ffUidInput.value = currentUser.ffUid || ''; 
             
-            // FF UID Flexibility: Show input if not in match AND not started
             if (!userInMatch && !isMatchStarted) {
                 ffUidInputSection.classList.remove('hidden');
             } else {
                 ffUidInputSection.classList.add('hidden');
             }
             
-            // Room ID/Password Reveal Logic: Handle here too, for immediate update
             if (userInMatch && isMatchStarted) {
                 app.revealRoomInfo(currentMatchData.roomId, currentMatchData.roomPass);
             } else {
@@ -669,11 +786,9 @@ const app = {
                          button.textContent = 'Already Joined';
                          button.disabled = true;
                     } else if (!currentUidInInput) {
-                         // User has to fill UID above to enable join buttons
                          button.textContent = 'Fill UID Above';
                          button.disabled = true;
                     } else {
-                         // Join using the currently filled UID (saved or temporary)
                          button.textContent = `Join Slot`;
                          button.disabled = false;
                          button.onclick = () => app.promptAndJoinSlot(mode, matchId, slotKey, currentUidInInput);
@@ -686,7 +801,6 @@ const app = {
         });
     },
     
-    // Join Slot with Confirmation (Uses the UID passed from the button)
     promptAndJoinSlot: (mode, matchId, slotKey, uidToUse) => {
         playClickSound();
         const confirmJoin = confirm(`Are you sure you want to join ${slotKey} with FF UID ${uidToUse}?`);
@@ -698,7 +812,6 @@ const app = {
         }
     },
 
-    // Join Slot (Uses the UID passed)
     joinSlot: async (mode, matchId, slotKey, uidToUse) => {
         playClickSound();
         const messageDiv = document.getElementById('slotPageMessage');
@@ -710,20 +823,19 @@ const app = {
             const result = await slotRef.transaction(currentData => {
                 if (currentData === null) {
                     if (currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid)) {
-                        return undefined; // Already joined another slot
+                        return undefined; 
                     }
                     
-                    // Automatically save the new UID if it's different and valid
                     if (uidToUse && uidToUse !== currentUser.ffUid) {
                         db.ref(`users/${currentUser.uid}/ffUid`).set(uidToUse);
-                        currentUser.ffUid = uidToUse; // Update global state
-                        document.getElementById('ffUidInput').value = uidToUse; // Keep the input updated
+                        currentUser.ffUid = uidToUse; 
+                        document.getElementById('ffUidInput').value = uidToUse; 
                     }
                     
                     return { 
                         uid: currentUser.uid, 
                         email: currentUser.email, 
-                        ffUid: uidToUse // Use the dynamic UID
+                        ffUid: uidToUse 
                     };
                 } else {
                     return undefined; 
@@ -758,8 +870,6 @@ const app = {
 
     showLeaderboard: () => {
         playClickSound();
-        // Assume you have a function to render the leaderboard data here
-        // app.renderLeaderboard();
         app.showPage('leaderboardPage');
     },
 
@@ -810,7 +920,7 @@ const app = {
         if (matchIntervals[match.id]) {
             clearInterval(matchIntervals[match.id]);
         }
-        // Timer interval set globally for continuous updates
+        
         matchIntervals[match.id] = setInterval(() => {
             app.updateMatchTimer(match.id, match, match.mode);
         }, 1000);
