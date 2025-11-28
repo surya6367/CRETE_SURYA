@@ -10,7 +10,7 @@
     --button-hover: #1a1a2e;
     --warning-red: #ff3366;
     --success-green: #33ff99;
-    --admin-color: #ffaa00; /* New color for admin features */
+    --admin-color: #ffaa00; 
 }
 
 body {
@@ -86,7 +86,7 @@ input[type="email"],
 input[type="password"],
 input[type="text"],
 input[type="datetime-local"],
-input[type="number"], /* Added input type number for kills */
+input[type="number"], 
 select {
     background-color: var(--darker-bg);
     border: 1px solid var(--border-color);
@@ -104,7 +104,7 @@ input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="text"]:focus,
 input[type="datetime-local"]:focus,
-input[type="number"]:focus, /* Added focus style for number */
+input[type="number"]:focus, 
 select:focus {
     outline: none;
     border-color: var(--neon-blue);
@@ -212,7 +212,7 @@ select:focus {
 
 .mode-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* Adjusted min width */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
     gap: 20px;
     width: 100%;
     margin-top: 20px;
@@ -222,14 +222,14 @@ select:focus {
     background-color: var(--darker-bg);
     border: 1px solid var(--neon-purple);
     border-radius: 10px;
-    padding: 0; /* Remove padding */
+    padding: 0; 
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
     display: flex;
     flex-direction: column;
     align-items: center;
-    overflow: hidden; /* To keep image corners inside */
+    overflow: hidden; 
 }
 
 .mode-card:hover {
@@ -239,12 +239,12 @@ select:focus {
 
 .mode-image {
     width: 100%;
-    max-width: 100%; /* Make image fill the card */
+    max-width: 100%; 
     height: auto;
-    border-radius: 8px; /* Slightly smaller radius for image inside card */
-    border: none; /* Remove border from image, card border is enough */
-    box-shadow: none; /* Remove box shadow from image */
-    margin: 0; /* Remove margin */
+    border-radius: 8px; 
+    border: none; 
+    box-shadow: none; 
+    margin: 0; 
     display: block;
 }
 
@@ -358,7 +358,7 @@ select:focus {
     border: 1px dashed var(--neon-purple);
     padding: 20px;
     margin-top: 20px;
-    margin-bottom: 20px; /* Added margin-bottom to separate from social links/footer */
+    margin-bottom: 20px; 
     border-radius: 10px;
 }
 
@@ -392,7 +392,6 @@ select:focus {
 }
 
 .admin-match-item .admin-details-btn {
-     /* New style for View Details button */
      background-color: var(--admin-color);
      border-color: var(--admin-color);
      color: var(--dark-bg);
@@ -426,9 +425,9 @@ select:focus {
     background-color: rgba(0, 255, 255, 0.05);
 }
 
-/* --- ADDED: Social Links Styling --- */
+/* --- Social Links Styling --- */
 .social-links {
-    margin: 20px auto 10px auto; /* Increased top margin, reduced bottom margin */
+    margin: 20px auto 10px auto; 
     padding: 15px;
     text-align: center;
     border-top: 1px solid var(--neon-purple); 
@@ -449,75 +448,17 @@ select:focus {
 }
 
 .social-links a i.fa-youtube:hover {
-    color: #FF0000; /* YouTube Red */
+    color: #FF0000; 
 }
 
 .social-links a i.fa-instagram:hover {
-    color: #E1306C; /* Instagram Pink/Red */
+    color: #E1306C; 
 }
 /* --- END Social Links Styling --- */
 
 
-/* Responsive */
-@media (max-width: 768px) {
-    .container {
-        padding: 20px;
-        width: 95%;
-    }
-    h1, h2 {
-        font-size: 1.5em;
-    }
-    button {
-        padding: 10px 20px;
-        font-size: 0.9em;
-    }
-    .mode-grid {
-        grid-template-columns: 1fr;
-    }
-    #dashboardPage .header {
-        flex-direction: column;
-        gap: 10px;
-    }
-    #dashboardPage .header h2 {
-        font-size: 1.5em;
-    }
-
-    /* ADDED: Mobile adjustments for match/slot items */
-    .match-item, .slot-item {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    .slot-item button {
-        width: 100%;
-        margin-top: 10px;
-    }
-    .admin-match-item {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .admin-match-item > div {
-        display: flex;
-        flex-wrap: wrap;
-        width: 100%;
-        margin-top: 5px;
-    }
-    .admin-match-item button {
-        flex-grow: 1;
-        margin: 2px;
-    }
-    
-    /* ADDED: Social Link sizing for mobile */
-    .social-links a {
-        font-size: 30px;
-        margin: 0 10px;
-    }
-    /* FIX: Closing curly brace for media query */
-}
-
 /* Warning effects */
 .warning-animation {
-    /* 1 Minute Warning Blink */
     animation: warnFlash 1s infinite alternate; 
     border: 3px solid var(--warning-red) !important;
     box-shadow: 0 0 15px var(--warning-red), 0 0 30px var(--warning-red) !important;
@@ -529,7 +470,6 @@ select:focus {
 }
 
 .critical-warning {
-    /* Final 1 Second Warning */
     animation: criticalShake 0.1s infinite alternate;
     border-color: yellow !important;
     box-shadow: 0 0 20px yellow, 0 0 40px red !important;
@@ -541,7 +481,6 @@ select:focus {
 }
 
 .screen-shake {
-    /* Overall screen shake */
     animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both infinite;
     transform: translate3d(0, 0, 0);
     backface-visibility: hidden;
@@ -579,4 +518,44 @@ select:focus {
     80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
 }
-/* Removed the extra closing curly brace '}' here */
+
+/* --- Mobile Responsiveness (Media Queries) --- */
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+        width: 95%;
+    }
+    h1, h2 {
+        font-size: 1.5em;
+    }
+    button {
+        padding: 10px 20px;
+        font-size: 0.9em;
+    }
+    .mode-grid {
+        grid-template-columns: 1fr;
+    }
+    .admin-match-item, .match-item, .slot-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .slot-item button {
+        width: 100%;
+        margin-top: 10px;
+    }
+    .admin-match-item > div {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-top: 5px;
+    }
+    .admin-match-item button {
+        flex-grow: 1;
+        margin: 2px;
+    }
+    .social-links a {
+        font-size: 30px;
+        margin: 0 10px;
+    }
+}
