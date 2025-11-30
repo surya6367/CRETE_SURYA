@@ -82,7 +82,7 @@ const clickSound = new Audio('sounds/click.wav');
 const warningSound = new Audio('sounds/warning.wav');
 const criticalSound = new Audio('sounds/beep.wav'); 
 
-// ⭐️ 1. New Background Music Setup
+// ⭐️ Background Music Setup
 let backgroundMusic = null; 
 
 function initializeBackgroundMusic() {
@@ -387,25 +387,28 @@ const app = {
         }
     },
 
-    // ⭐️ 4. Admin edit room ID/Pass last 30 seconds
+    // ⭐️ 1. Admin edit room ID/Pass Logic Updated
     adminEditMatch: async (mode, matchId, currentData) => {
         playClickSound();
         if (!isAdmin) return;
 
         const now = Date.now();
         const startTime = currentData.startTime;
-        const timeDiffSeconds = Math.floor((startTime - now) / 1000);
-        const timeToDeleteSeconds = Math.floor((startTime + 40000 - now) / 1000); 
+        const timeDiffSeconds = Math.floor((startTime - now) / 1000); // Time till match start (positive = upcoming, negative = started)
+        const timeToDeleteSeconds = Math.floor((startTime + 40000 - now) / 1000); // Time till auto-delete
 
-        // Editable condition: Between 30 seconds before match start and 40 seconds after start (the auto-delete time)
-        const isEditable = (timeDiffSeconds <= 30 && timeToDeleteSeconds > 0);
+        // ⭐️ Prompt is now shown regardless of time
+        const newRoomId = prompt(`Enter new Room ID for ${currentData.name}:`, currentData.roomId);
+        if (newRoomId === null) return;
+        const newRoomPass = prompt(`Enter new Room Pass for ${currentData.name}:`, currentData.roomPass);
+        if (newRoomPass === null) return;
+
+        // Condition check BEFORE updating the database:
+        // Must be editable until 5 seconds *after* the match starts.
+        // timeDiffSeconds < -5 means match started more than 5 seconds ago.
+        const isEditable = (timeDiffSeconds >= -5 && timeToDeleteSeconds > 0);
 
         if (isEditable) {
-            const newRoomId = prompt(`Enter new Room ID for ${currentData.name}:`, currentData.roomId);
-            if (newRoomId === null) return;
-            const newRoomPass = prompt(`Enter new Room Pass for ${currentData.name}:`, currentData.roomPass);
-            if (newRoomPass === null) return;
-
             try {
                 await db.ref(`matches/${mode}/${matchId}`).update({
                     roomId: newRoomId.trim(),
@@ -417,7 +420,7 @@ const app = {
                 console.error("Admin Edit error:", error);
             }
         } else {
-            alert('Room details can only be edited between 30 seconds before match start and before the match is automatically deleted.');
+            alert('Room details can no longer be edited. Editing is stopped 5 seconds after the scheduled start time.');
         }
     },
     
@@ -687,14 +690,14 @@ const app = {
         app.listenForMatches(mode);
     },
     
-    // Timer Update & Auto-Delete Logic (Same as previous update)
+    // Timer Update & Auto-Delete Logic 
     updateMatchTimer: (matchId, matchData, mode) => {
         const now = Date.now();
         const startTime = matchData.startTime;
-        const deleteTime = startTime + 40000; 
+        const deleteTime = startTime + 40000;
         
         const timeDiffSeconds = Math.floor((startTime - now) / 1000);
-        const timeToDeleteSeconds = Math.floor((deleteTime - now) / 1000); 
+        const timeToDeleteSeconds = Math.floor((deleteTime - now) / 1000);
         
         const timerSpan = document.querySelector(`[data-match-timer-id="${matchId}"]`);
         const statusSpan = document.querySelector(`[data-match-status-id="${matchId}"]`);
@@ -704,7 +707,7 @@ const app = {
         const isCurrentlyViewing = (matchId === currentMatchId && document.getElementById('slotPage').classList.contains('active'));
         const matchContainer = document.getElementById('mainContainer');
         const matchDetailsElement = document.getElementById('currentMatchDetails');
-        const slotTimerElement = document.getElementById('slotPageTimer'); 
+        const slotTimerElement = document.getElementById('slotPageTimer');
         
         const slotStatusSpan = document.querySelector('#currentMatchDetails [data-match-status-id="slot-page-status"]');
 
@@ -734,27 +737,33 @@ const app = {
             }
 
             if (isCurrentlyViewing) {
-                // ⭐️ Warning period changed to 30 seconds
-                if (timeDiffSeconds === 30) {
-                    playWarningSound(); 
-                    matchDetailsElement.classList.add('warning-animation'); 
-                } else if (timeDiffSeconds > 30) {
+                // ⭐️ 2. Warning Blinking starts 60 seconds (1 minute) before match start
+                if (timeDiffSeconds <= 60 && timeDiffSeconds > 1) {
+                    // Check only at the start of the 60 second window to play the sound once
+                    if (timeDiffSeconds === 60) {
+                        playWarningSound();
+                    }
+                    matchDetailsElement.classList.add('warning-animation');
+                    matchDetailsElement.classList.remove('critical-warning');
+                    matchContainer.classList.remove('screen-shake');
+                } else if (timeDiffSeconds > 60) {
                     matchDetailsElement.classList.remove('warning-animation');
-                    matchDetailsElement.classList.remove('critical-warning'); 
+                    matchDetailsElement.classList.remove('critical-warning');
                     matchContainer.classList.remove('screen-shake');
                 }
 
                 if (timeDiffSeconds === 1) {
-                    playCriticalSound(); 
-                    matchDetailsElement.classList.add('critical-warning'); 
-                    matchContainer.classList.add('screen-shake'); 
+                    playCriticalSound();
+                    matchDetailsElement.classList.add('critical-warning');
+                    matchDetailsElement.classList.remove('warning-animation');
+                    matchContainer.classList.add('screen-shake');
                 }
             }
 
 
         } else if (timeToDeleteSeconds > 0) {
             // Live Match
-            const liveTime = 30 + timeDiffSeconds; 
+            const liveTime = 30 + timeDiffSeconds;
             
             let timeText;
             if (liveTime > 0) {
@@ -799,7 +808,7 @@ const app = {
 
         } else {
             // Match Ended - AUTO-DELETE
-            app.deleteMatch(mode, matchId); 
+            app.deleteMatch(mode, matchId);
             
             timerSpan.textContent = 'DELETED';
             statusSpan.textContent = 'DELETED';
