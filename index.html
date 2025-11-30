@@ -18,6 +18,7 @@
     <div class="container hidden" id="mainContainer">
         
         <div id="welcomePage" class="page active">
+            <div id="logoContainer" class="main-logo"></div>
             <h1>Welcome to SURYA Tournament</h1>
             <p>Your ultimate gaming battleground!</p>
             <button onclick="app.showPage('loginPage');">Login</button>
@@ -25,6 +26,7 @@
         </div>
 
         <div id="loginPage" class="page hidden">
+            <button class="back-btn" onclick="app.showPage('welcomePage');"><i class="fas fa-arrow-left"></i> Back</button>
             <h2>Login</h2>
             <input type="email" id="loginEmail" placeholder="Email" required>
             <input type="password" id="loginPassword" placeholder="Password" required>
@@ -32,28 +34,39 @@
             <p><a href="#" onclick="app.showPage('signupPage');">Don't have an account? Signup</a></p>
             <p><a href="#" onclick="app.resetPassword();">Forgot Password?</a></p>
             <div id="loginMessage" class="message hidden"></div>
-            <button onclick="app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
         </div>
 
         <div id="signupPage" class="page hidden">
+            <button class="back-btn" onclick="app.showPage('welcomePage');"><i class="fas fa-arrow-left"></i> Back</button>
             <h2>Signup</h2>
+            <input type="text" id="signupUsername" placeholder="In-Game Name (IGN)" required> 
             <input type="email" id="signupEmail" placeholder="Email" required>
             <input type="password" id="signupPassword" placeholder="Password" required>
             <button onclick="app.signupUser();">Signup</button>
             <p><a href="#" onclick="app.showPage('loginPage');">Already have an account? Login</a></p>
             <div id="signupMessage" class="message hidden"></div>
-            <button onclick="app.showPage('welcomePage');" style="margin-top: 20px;">Back</button>
         </div>
 
         <div id="dashboardPage" class="page hidden">
             <div class="header">
-                <h2 id="welcomeUser">Welcome, Player!</h2>
-                <div>
-                    <button onclick="app.showLeaderboard();">Leaderboard</button>
-                    <button onclick="app.logoutUser();">Logout</button>
+                <div id="dashboardLogo" class="circular-logo" style="margin-right: auto;"></div>
+                
+                <div class="dashboard-center-header">
+                    <h2 id="welcomeUser" style="margin-top: 5px;">Welcome, Player!</h2>
                 </div>
+
+                <button class="profile-icon-btn large-icon-btn" onclick="app.showPage('profilePage');" title="Profile"><i class="fas fa-user-circle"></i></button>
             </div>
 
+            <div class="social-links" style="margin-bottom: 20px;">
+                <a href="https://www.youtube.com/@Surya_Gamer999" target="_blank" aria-label="YouTube Channel">
+                    <i class="fab fa-youtube"></i>
+                </a>
+                <a href="https://www.instagram.com/mr_surya620?igsh=MXdheXNtbnEzMWJpZA==" target="_blank" aria-label="Instagram Profile">
+                    <i class="fab fa-instagram"></i>
+                </a>
+            </div>
+                
             <h3>Select Mode</h3>
             <div class="mode-grid" id="modeGrid">
                 <div class="mode-card" data-mode="1v1" onclick="app.selectMode('1v1');">
@@ -68,19 +81,11 @@
                 <div class="mode-card" data-mode="4v4" onclick="app.selectMode('4v4');">
                     <img src="https://i.postimg.cc/FKTYT0YX/4v4.jpg" alt="4v4 Mode" class="mode-image">
                 </div>
-                <div class="mode-card" data-mode="BR48" onclick="app.selectMode('BR48');">
+                <div class="mode-card br48-card" data-mode="BR48" onclick="app.selectMode('BR48');">
                     <img src="https://i.postimg.cc/bNPtgxgs/br.jpg" alt="BR48 Mode" class="mode-image">
                 </div>
             </div>
             
-            <div class="social-links">
-                <a href="https://www.youtube.com/@Surya_Gamer999" target="_blank" aria-label="YouTube Channel">
-                    <i class="fab fa-youtube"></i>
-                </a>
-                <a href="https://www.instagram.com/mr_surya620?igsh=MXdheXNtbnEzMWJpZA==" target="_blank" aria-label="Instagram Profile">
-                    <i class="fab fa-instagram"></i>
-                </a>
-            </div>
             <div id="adminPanel" class="hidden">
                 <h3>Admin Controls</h3>
                 <div class="admin-controls">
@@ -115,54 +120,71 @@
         </div>
 
         <div id="matchListPage" class="page hidden">
-            <h2 id="matchListTitle">Matches for [Mode]</h2>
+            <button class="back-btn" onclick="app.showPage('dashboardPage');"><i class="fas fa-arrow-left"></i> Back</button>
+            <h2 id="matchListTitle" style="margin-top: 50px;">Matches for [Mode]</h2>
             <div id="matchesContainer" class="match-list"></div>
-            <button onclick="app.showPage('dashboardPage');" style="margin-top: 20px;">Back to Dashboard</button>
         </div>
 
         <div id="slotPage" class="page hidden">
-            <h2 id="slotPageMatchTitle">Match Details</h2>
+            <button class="back-btn" onclick="app.backToMatchList();"><i class="fas fa-arrow-left"></i> Back</button>
+            <h2 id="slotPageMatchTitle" style="margin-top: 50px;">Match Details</h2>
             <div class="match-item" id="currentMatchDetails">
+                <div class="match-details slot-details-header">
+                    <span><strong>Mode:</strong> <span data-match-mode></span></span>
+                    <span><strong>Start:</strong> <span data-match-start></span></span>
+                    <span><strong>Slots:</strong> <span data-match-slots></span></span>
+                </div>
                 <div class="match-details">
-                    <span><strong>Match:</strong> <span id="matchNameDisplay"></span> (<span id="matchModeDisplay"></span>)</span>
+                    <span><strong>Status:</strong> <span data-match-status-id="slot-page-status" class="status">Loading...</span></span>
                     <span><strong>Countdown:</strong> <span id="slotPageTimer">--:--:--</span></span> 
                 </div>
+
                 <div class="room-info">
                     <div>Room ID: <span id="roomIdDisplay">********</span></div>
                     <div>Room Pass: <span id="roomPassDisplay">********</span></div>
                 </div>
             </div>
 
-            <div id="ffUidInputSection">
-                <h3>Enter Your Free Fire UID</h3>
-                <input type="text" id="ffUidInput" placeholder="Free Fire UID" required>
-                <button onclick="app.saveFFUid();">Save UID</button>
-                <div id="ffUidMessage" class="message hidden"></div>
-            </div>
-
             <h3>Slots (<span id="slotsCount">0</span>/<span id="maxSlots">0</span>)</h3>
             <div id="slotsContainer" class="slot-list"></div>
             <div id="slotPageMessage" class="message hidden"></div>
-            <button onclick="app.backToMatchList();" style="margin-top: 20px;">Back to Matches</button>
         </div>
 
+        <div id="profilePage" class="page hidden">
+            <button class="back-btn" onclick="app.showPage('dashboardPage');"><i class="fas fa-arrow-left"></i> Back</button>
+            <h2 style="margin-top: 50px;"><span id="profileWelcomeName">Player</span> Profile</h2>
+            <p>Your In-Game Name (IGN) and Free Fire UID are required to join any match.</p>
+            <div id="profileInputSectionProfile" class="profile-input-section">
+                <input type="text" id="usernameInputProfile" placeholder="In-Game Name (IGN)" required> 
+                <input type="text" id="ffUidInputProfile" placeholder="Free Fire UID" required>
+                <button onclick="app.saveProfileDetails();">Save Profile</button>
+                <div id="profileMessageProfile" class="message hidden"></div>
+            </div>
+            
+            <div style="margin-top: 30px; width: 100%;">
+                <button onclick="app.showLeaderboard();" style="width: 100%; margin-bottom: 10px;"><i class="fas fa-trophy"></i> View Leaderboard</button>
+                <button onclick="app.logoutUser();" style="width: 100%; background-color: var(--warning-red); border-color: var(--warning-red);"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </div>
+        
         <div id="leaderboardPage" class="page hidden">
-            <h2>Leaderboard</h2>
+            <button class="back-btn" onclick="app.showPage('dashboardPage');"><i class="fas fa-arrow-left"></i> Back</button>
+            <h2 style="margin-top: 50px;">Leaderboard</h2>
             <table class="leaderboard-table">
                 <thead>
                     <tr>
                         <th>Rank</th>
-                        <th>Player UID</th>
+                        <th>IGN/Username</th> 
+                        <th>Player UID</th> 
                         <th>Wins</th>
                         <th>Kills</th>
                         <th>Points</th>
                     </tr>
                 </thead>
                 <tbody id="leaderboardBody">
-                    <tr><td colspan="5">Loading leaderboard...</td></tr>
+                    <tr><td colspan="6">Loading leaderboard...</td></tr>
                 </tbody>
             </table>
-            <button onclick="app.showPage('dashboardPage');" style="margin-top: 20px;">Back to Dashboard</button>
         </div>
     </div>
 
