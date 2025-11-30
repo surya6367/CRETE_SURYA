@@ -23,7 +23,7 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: hidden; /* Prevent horizontal scrolling */
     position: relative;
     transition: background 0.3s ease-in-out;
     animation: backgroundFade 10s infinite alternate;
@@ -65,7 +65,7 @@ h1, h2, h3, h4 {
 }
 
 
-/* ⭐️ LOGO STYLE: Size increased to 90px (4.) */
+/* ⭐️ LOGO STYLE */
 .circular-logo {
     width: 90px; 
     height: 90px;
@@ -264,11 +264,17 @@ select:focus {
     flex-grow: 1; 
     text-align: center;
     margin: 0 10px;
+    min-width: 0; /* Important for flex items to shrink correctly */
 }
 
 #dashboardPage .header h2 {
     margin: 0;
     font-size: 1.8em;
+    /* ⭐️ Prevent h2 from pushing out the sides */
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0; 
 }
 
 /* ⭐️ Logo Style adjustment in Dashboard Header */
@@ -666,33 +672,46 @@ select:focus {
         font-size: 30px;
         margin: 0 10px;
     }
-    /* Dashboard Header on Mobile */
+    
+    /* Dashboard Header on Mobile - Fixed for No Slide */
     #dashboardPage .header {
         flex-direction: row; 
         align-items: center;
         flex-wrap: nowrap;
+        padding-left: 0;
+        padding-right: 0;
     }
+    
+    /* ⭐️ 1. Logo Adjustment for Mobile */
+    #dashboardPage .header .circular-logo {
+        width: 60px; /* Logo slightly reduced for tight mobile screen */
+        height: 60px;
+        margin-left: 15px; /* Add some margin from left edge */
+        margin-right: 10px;
+    }
+
     #dashboardPage .dashboard-center-header {
         text-align: center;
+        margin: 0 5px;
     }
-    #dashboardPage .header h2, .ff-uid-status {
-        width: auto;
+    #dashboardPage .header h2 {
+        font-size: 1.2em; /* Smaller font on mobile */
         text-align: center;
-        margin: 0;
+        width: 100%;
     }
-    /* Logo on Mobile Dashboard Header */
-    #dashboardLogo {
-        display: block !important;
+    
+    /* Profile Icon Adjustments */
+    .large-icon-btn {
+        width: 45px;
+        height: 45px;
+        margin-left: 10px;
+        margin-right: 15px; /* Add some margin from right edge */
     }
     
     /* Back Button adjustments for Mobile */
     .back-btn {
         top: 10px;
         left: 10px;
-    }
-    
-    .large-icon-btn {
-        margin-left: 10px;
     }
 }
 
