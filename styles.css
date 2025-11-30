@@ -59,6 +59,25 @@ h1, h2, h3, h4 {
     margin-bottom: 20px;
     font-family: 'Press Start 2P', cursive;
 }
+/* ⭐️ Adjust h2 margin-top to clear back button on back pages */
+#matchListPage h2, #slotPage h2, #profilePage h2, #leaderboardPage h2 {
+    margin-top: 50px; 
+}
+
+
+/* ⭐️ UPDATED LOGO URL */
+.circular-logo {
+    width: 70px; /* Increased size */
+    height: 70px;
+    background-image: url('https://homely-white-ji4fmmoync-eo5h3w2ugd.edgeone.dev/Gemini_Generated_Image_7mpphq7mpphq7mpp.png');
+    background-size: cover; 
+    background-repeat: no-repeat; /* Ensure no repetition */
+    background-position: center;
+    border-radius: 50%; /* Made circular */
+    border: 3px solid var(--neon-blue); /* Thicker border */
+    box-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-purple); /* Added neon glow */
+    margin-right: 15px;
+}
 
 button {
     background-color: var(--button-bg);
@@ -80,6 +99,47 @@ button:hover {
     color: var(--dark-bg);
     box-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-purple);
     transform: translateY(-2px);
+}
+
+/* ⭐️ 3. Back Button Styling Adjustment */
+.back-btn {
+    position: absolute;
+    top: 10px; 
+    left: 10px; 
+    padding: 8px 12px;
+    font-size: 0.8em;
+    z-index: 20;
+    background-color: rgba(10, 20, 40, 0.9); /* Add background for clarity */
+    border: 1px solid var(--neon-purple);
+    color: var(--neon-purple);
+    box-shadow: 0 0 5px var(--neon-purple);
+    text-transform: none;
+}
+.back-btn:hover {
+    background-color: var(--neon-purple);
+    color: var(--dark-bg);
+    box-shadow: 0 0 8px var(--neon-purple);
+    transform: none;
+}
+.back-btn i {
+    margin-right: 5px;
+}
+/* ⭐️ END Back Button Styling */
+
+/* ⭐️ Profile Icon Button Styling */
+.large-icon-btn {
+    font-size: 1.8em; /* Slightly larger icon */
+    padding: 10px;
+    width: 60px;
+    height: 60px;
+    margin: 0;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.large-icon-btn:hover {
+    transform: scale(1.1);
 }
 
 input[type="email"],
@@ -191,6 +251,7 @@ select:focus {
 /* Dashboard Styles */
 #dashboardPage .header {
     display: flex;
+    flex-wrap: nowrap; 
     justify-content: space-between;
     align-items: center;
     width: 100%;
@@ -199,9 +260,39 @@ select:focus {
     padding-bottom: 15px;
 }
 
+#dashboardPage .dashboard-center-header {
+    flex-grow: 1; 
+    text-align: center;
+    margin: 0 10px;
+}
+
 #dashboardPage .header h2 {
     margin: 0;
     font-size: 1.8em;
+}
+
+/* ⭐️ Logo Style adjustment in Dashboard Header */
+#dashboardPage .header .circular-logo {
+    display: block; 
+}
+
+
+.ff-uid-status {
+    font-size: 0.9em;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin: 5px 0;
+}
+
+.ff-uid-status.set {
+    color: var(--success-green);
+    border: 1px solid var(--success-green);
+}
+
+.ff-uid-status.not-set {
+    color: var(--warning-red);
+    border: 1px solid var(--warning-red);
 }
 
 #dashboardPage .header button {
@@ -210,26 +301,42 @@ select:focus {
     font-size: 0.9em;
 }
 
+/* ⭐️ Profile Input Section Styling */
+.profile-input-section {
+    width: 100%;
+    background-color: rgba(50, 50, 50, 0.2);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px dashed var(--neon-blue);
+}
+.profile-input-section h3 {
+    margin-top: 0;
+    font-size: 1.2em;
+}
+
+/* ⭐️ Match Mode Grid (2xN layout) */
 .mode-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+    grid-template-columns: 1fr 1fr; /* Two columns */
     gap: 20px;
     width: 100%;
     margin-top: 20px;
 }
 
 .mode-card {
-    background-color: var(--darker-bg);
-    border: 1px solid var(--neon-purple);
-    border-radius: 10px;
+    /* ... existing styles ... */
     padding: 0; 
     cursor: pointer;
+    background-color: var(--darker-bg);
+    border: 2px solid var(--neon-blue);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
     transition: all 0.3s ease;
-    box-shadow: 0 0 8px rgba(255, 0, 255, 0.4);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    overflow: hidden; 
+}
+/* Ensure the BR48 card spans both columns */
+.br48-card {
+    grid-column: span 2; 
 }
 
 .mode-card:hover {
@@ -397,7 +504,13 @@ select:focus {
      color: var(--dark-bg);
      box-shadow: 0 0 5px var(--admin-color);
 }
-.admin-match-item .admin-details-btn:hover {
+.admin-match-item .admin-edit-btn {
+    background-color: var(--neon-blue);
+    border-color: var(--neon-blue);
+    color: var(--dark-bg);
+}
+.admin-match-item .admin-details-btn:hover, 
+.admin-match-item .admin-edit-btn:hover {
      background-color: white;
 }
 
@@ -495,6 +608,7 @@ select:focus {
 }
 
 .match-starting-message {
+    /* ... (unchanged) ... */
     position: fixed;
     top: 50%;
     left: 50%;
@@ -532,9 +646,15 @@ select:focus {
         padding: 10px 20px;
         font-size: 0.9em;
     }
+    /* ⭐️ Match Mode Grid (Mobile: 1xN for better mode card size) */
     .mode-grid {
         grid-template-columns: 1fr;
     }
+    /* BR48 Card takes full width */
+    .br48-card {
+        grid-column: span 1; 
+    }
+
     .admin-match-item, .match-item, .slot-item {
         flex-direction: column;
         align-items: flex-start;
@@ -557,5 +677,41 @@ select:focus {
     .social-links a {
         font-size: 30px;
         margin: 0 10px;
+    }
+    /* Dashboard Header on Mobile */
+    #dashboardPage .header {
+        flex-direction: row; /* Keep row for icon and logo/text */
+        align-items: center;
+        flex-wrap: nowrap;
+    }
+    #dashboardPage .dashboard-center-header {
+        text-align: center;
+    }
+    #dashboardPage .header h2, .ff-uid-status {
+        width: auto;
+        text-align: center;
+        margin: 0;
+    }
+    /* Logo on Mobile Dashboard Header */
+    #dashboardLogo {
+        display: block !important;
+        /* circular-logo style already handles size */
+    }
+    
+    /* Back Button adjustments for Mobile */
+    .back-btn {
+        top: 10px;
+        left: 10px;
+    }
+    
+    .large-icon-btn {
+        margin-left: 10px;
+    }
+}
+
+/* ⭐️ Tablet/Mid-Sized Screen Optimization (For 2x2 grid) */
+@media (min-width: 481px) and (max-width: 768px) {
+     .mode-grid {
+        grid-template-columns: 1fr 1fr; /* Keep 2 columns */
     }
 }
