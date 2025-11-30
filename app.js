@@ -18,9 +18,9 @@ let appInstance = null;
 const initFirebase = () => {
     // Check if Firebase SDK is loaded (The main FIX for "Loading...")
     if (typeof firebase === 'undefined' || typeof firebase.initializeApp === 'undefined') {
-         console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
-         document.getElementById('loadingPage').innerHTML = '<h2>Error: Firebase library not loaded. Check index.html.</h2>';
-         return;
+        console.error("FATAL ERROR: Firebase SDK not loaded. Check script tags in index.html.");
+        document.getElementById('loadingPage').innerHTML = '<h2>Error: Firebase library not loaded. Check index.html.</h2>';
+        return;
     }
     try {
         appInstance = firebase.initializeApp(firebaseConfig);
@@ -33,17 +33,23 @@ const initFirebase = () => {
             const loadingPage = document.getElementById('loadingPage');
             const mainContainer = document.getElementById('mainContainer');
             
-            // This is the line that makes the website advance past the loading screen
             loadingPage.classList.add('hidden'); 
             mainContainer.classList.remove('hidden'); 
             
             if (user) {
                 currentUser = user;
                 isAdmin = (user.email === ADMIN_EMAIL);
-                document.getElementById('welcomeUser').textContent = `Welcome, ${user.email.split('@')[0]}!`;
                 
-                db.ref(`users/${user.uid}/ffUid`).once('value', (snapshot) => {
-                    currentUser.ffUid = snapshot.val();
+                // ⭐️ FETCH BOTH FF UID AND USERNAME
+                db.ref(`users/${user.uid}`).once('value', (snapshot) => {
+                    const userData = snapshot.val() || {};
+                    currentUser.ffUid = userData.ffUid;
+                    // Default username to email part if not set
+                    currentUser.username = userData.username || user.email.split('@')[0]; 
+                    
+                    // ⭐️ Welcome message updated to use only username
+                    document.getElementById('welcomeUser').textContent = `Welcome, ${currentUser.username}!`;
+                    
                     app.showPage('dashboardPage');
                 });
             } else {
@@ -66,17 +72,34 @@ let currentMatchId = '';
 let matchIntervals = {};
 let currentUser = null;
 let currentMatchData = null; 
+let activeMatchListListener = null; 
 
-// Score Configuration (Assumed from previous context)
 const POINTS_PER_WIN = 10;
 const POINTS_PER_KILL = 1;
 
-// Sound Setup
+// Sound Setup 
 const clickSound = new Audio('sounds/click.wav'); 
 const warningSound = new Audio('sounds/warning.wav');
 const criticalSound = new Audio('sounds/beep.wav'); 
 
-// Fallback logic if .wav files fail to load
+// ⭐️ 1. New Background Music Setup
+let backgroundMusic = null; 
+
+function initializeBackgroundMusic() {
+    // Use the user-provided URL for background music
+    const musicUrl = 'https://vocaroo.com/14pTVHSVIoNz';
+    backgroundMusic = new Audio(musicUrl);
+    backgroundMusic.loop = true;
+    backgroundMusic.volume = 0.5; // Set volume lower so it doesn't overpower click sounds
+    backgroundMusic.preload = 'auto';
+
+    backgroundMusic.onerror = () => {
+         console.error("FATAL: Background music failed to load from Vocaroo URL.");
+    };
+}
+
+
+// Fallback logic (unchanged)
 clickSound.onerror = () => { 
     if(clickSound.src.includes('.wav')) {
         clickSound.src = 'sounds/click.mp3'; 
@@ -108,7 +131,15 @@ function playSound(audioElement) {
     }
 }
 
-function playClickSound() { playSound(clickSound); }
+function playClickSound() { 
+    // Start or resume background music on the first user interaction
+    if (backgroundMusic && backgroundMusic.paused) {
+        backgroundMusic.play().catch(e => {
+            console.error("Background music auto-play blocked.", e.message);
+        });
+    }
+    playSound(clickSound); 
+}
 function playWarningSound() { playSound(warningSound); }
 function playCriticalSound() { playSound(criticalSound); }
 
@@ -129,7 +160,6 @@ function displayMessage(element, message, type) {
     element.textContent = message;
     element.className = `message ${type}`;
     element.classList.remove('hidden');
-    // Using a shorter duration for click feedback messages
     const duration = type === 'click-feedback' ? 500 : 5000;
     setTimeout(() => { element.classList.add('hidden'); }, duration);
 }
@@ -146,31 +176,63 @@ const app = {
         document.getElementById(pageId).classList.add('active');
         document.getElementById(pageId).classList.remove('hidden');
         
+        // ⭐️ Back button visibility check - only hide the button when on welcome page
+        document.querySelectorAll('.back-btn').forEach(btn => {
+            if (pageId === 'welcomePage') {
+                btn.classList.add('hidden');
+            } else {
+                btn.classList.remove('hidden');
+            }
+        });
+
         if (pageId === 'dashboardPage') {
             app.updateAdminPanelVisibility();
             app.renderAdminMatches();
-            // Assuming renderAdminResultSelect is a necessary function for Admin panel
             app.renderAdminResultSelect(); 
-        } else if (pageId === 'leaderboardPage') {
-            app.renderLeaderboard();
+        } else if (pageId === 'profilePage') {
+            // ⭐️ Load current profile data into profile page inputs
+            if (currentUser) {
+                document.getElementById('ffUidInputProfile').value = currentUser.ffUid || '';
+                document.getElementById('usernameInputProfile').value = currentUser.username || '';
+                // ⭐️ Update profile welcome name
+                document.getElementById('profileWelcomeName').textContent = currentUser.username;
+            }
+        }
+        
+        if (pageId === 'welcomePage') {
+             if (activeMatchListListener) {
+                db.ref(activeMatchListListener.path).off('value', activeMatchListListener.callback);
+                activeMatchListListener = null;
+            }
+            Object.values(matchIntervals).forEach(clearInterval);
+            matchIntervals = {};
         }
     },
 
-    // --- Auth Handlers ---
+    // ⭐️ FF UID Display is now obsolete on dashboard, keeping function simple
+    updateFFUidDisplay: () => {
+        // This function is kept for data integrity in other parts of the code
+        // but no longer affects the dashboard UI directly.
+    },
+
+    // --- Auth Handlers (Same as previous update) ---
     signupUser: async () => { 
         playClickSound();
         const email = document.getElementById('signupEmail').value;
         const password = document.getElementById('signupPassword').value;
+        const username = document.getElementById('signupUsername').value.trim();
         const messageDiv = document.getElementById('signupMessage');
         messageDiv.classList.add('hidden');
 
-        if (!email || password.length < 6) {
-            displayMessage(messageDiv, 'Enter valid email and password (min 6 chars).', 'error');
+        if (!email || password.length < 6 || !username || username.length < 3) {
+            displayMessage(messageDiv, 'Enter valid email, password (min 6 chars), and Username (min 3 chars).', 'error');
             return;
         }
 
         try {
-            await auth.createUserWithEmailAndPassword(email, password);
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            await db.ref(`users/${userCredential.user.uid}/username`).set(username);
+
             displayMessage(messageDiv, 'Account created successfully! Logging in...', 'success');
         } catch (error) {
             displayMessage(messageDiv, `Error: ${error.message}`, 'error');
@@ -201,6 +263,10 @@ const app = {
             await auth.signOut();
             Object.values(matchIntervals).forEach(clearInterval);
             matchIntervals = {};
+            if (activeMatchListListener) {
+                db.ref(activeMatchListListener.path).off('value', activeMatchListListener.callback);
+                activeMatchListListener = null;
+            }
         } catch (error) {
             console.error("Logout error:", error);
         }
@@ -224,29 +290,45 @@ const app = {
         }
     },
 
-    // Save FF UID Function
-    saveFFUid: async () => {
+    // ⭐️ Save Profile Details from the dedicated Profile Page
+    saveProfileDetails: async () => {
         playClickSound();
-        const ffUidInput = document.getElementById('ffUidInput');
+        const ffUidInput = document.getElementById('ffUidInputProfile'); 
+        const usernameInput = document.getElementById('usernameInputProfile'); 
+        
         const uidToSave = ffUidInput.value.trim();
-        const messageDiv = document.getElementById('ffUidMessage');
+        const usernameToSave = usernameInput.value.trim();
+        
+        const messageDiv = document.getElementById('profileMessageProfile'); 
         messageDiv.classList.add('hidden');
-        if (!uidToSave || uidToSave.length < 5 || isNaN(uidToSave)) { 
-             displayMessage(messageDiv, 'Please enter a valid Free Fire UID (digits only).', 'error');
+        
+        if (!uidToSave || uidToSave.length < 5 || isNaN(uidToSave) || !usernameToSave || usernameToSave.length < 3) {
+             displayMessage(messageDiv, 'Please enter a valid Free Fire UID (digits only) and a Username (min 3 chars).', 'error');
              return;
         }
         
         try {
-             await db.ref(`users/${currentUser.uid}/ffUid`).set(uidToSave);
+             const updates = {
+                 ffUid: uidToSave,
+                 username: usernameToSave
+             };
+             await db.ref(`users/${currentUser.uid}`).update(updates);
+
              currentUser.ffUid = uidToSave; 
-             displayMessage(messageDiv, 'Free Fire UID saved successfully!', 'success');
+             currentUser.username = usernameToSave; 
              
-             if (document.getElementById('slotPage').classList.contains('active')) {
-                 app.listenForSlots(currentMode, currentMatchId);
-             }
+             document.getElementById('welcomeUser').textContent = `Welcome, ${currentUser.username}!`; // Update dashboard welcome
+             document.getElementById('profileWelcomeName').textContent = currentUser.username; // Update profile welcome
+             
+             displayMessage(messageDiv, 'Profile details saved successfully! Redirecting to Dashboard...', 'success');
+             
+             setTimeout(() => {
+                 app.showPage('dashboardPage');
+             }, 1000);
+             
         } catch (error) {
-             displayMessage(messageDiv, `Error saving UID: ${error.message}`, 'error');
-             console.error("UID save error:", error);
+             displayMessage(messageDiv, `Error saving profile: ${error.message}`, 'error');
+             console.error("Profile save error:", error);
         }
     },
 
@@ -263,7 +345,7 @@ const app = {
     createMatch: async () => {
         playClickSound(); 
         if (!isAdmin) return; 
-
+        
         const mode = document.getElementById('adminMatchMode').value;
         const name = document.getElementById('adminMatchName').value.trim();
         const roomId = document.getElementById('adminRoomId').value.trim();
@@ -299,13 +381,46 @@ const app = {
             document.getElementById('adminRoomPass').value = '';
             document.getElementById('adminMatchName').value = '';
             document.getElementById('adminMatchStartTime').value = '';
-            app.renderAdminResultSelect(); // Refresh result dropdown
+            app.renderAdminResultSelect(); 
         } catch (error) {
             displayMessage(messageDiv, `Error creating match: ${error.message}`, 'error');
         }
     },
+
+    // ⭐️ 4. Admin edit room ID/Pass last 30 seconds
+    adminEditMatch: async (mode, matchId, currentData) => {
+        playClickSound();
+        if (!isAdmin) return;
+
+        const now = Date.now();
+        const startTime = currentData.startTime;
+        const timeDiffSeconds = Math.floor((startTime - now) / 1000);
+        const timeToDeleteSeconds = Math.floor((startTime + 40000 - now) / 1000); 
+
+        // Editable condition: Between 30 seconds before match start and 40 seconds after start (the auto-delete time)
+        const isEditable = (timeDiffSeconds <= 30 && timeToDeleteSeconds > 0);
+
+        if (isEditable) {
+            const newRoomId = prompt(`Enter new Room ID for ${currentData.name}:`, currentData.roomId);
+            if (newRoomId === null) return;
+            const newRoomPass = prompt(`Enter new Room Pass for ${currentData.name}:`, currentData.roomPass);
+            if (newRoomPass === null) return;
+
+            try {
+                await db.ref(`matches/${mode}/${matchId}`).update({
+                    roomId: newRoomId.trim(),
+                    roomPass: newRoomPass.trim()
+                });
+                alert('Room details updated successfully!');
+            } catch (error) {
+                alert(`Error updating room details: ${error.message}`);
+                console.error("Admin Edit error:", error);
+            }
+        } else {
+            alert('Room details can only be edited between 30 seconds before match start and before the match is automatically deleted.');
+        }
+    },
     
-    // Admin Result Select functionality (Needed for index.html)
     renderAdminResultSelect: () => {
         if (!isAdmin) return;
         
@@ -317,7 +432,6 @@ const app = {
                 modeSnap.forEach(matchSnap => {
                     const match = matchSnap.val();
                     const matchId = matchSnap.key;
-                    // Only show matches without results
                     if (!match.result) { 
                         const option = document.createElement('option');
                         option.value = `${mode}|${matchId}`; 
@@ -329,7 +443,6 @@ const app = {
         });
     },
 
-    // Submit Match Result Function (Needed for index.html)
     submitMatchResult: async () => {
         playClickSound();
         if (!isAdmin) return;
@@ -356,7 +469,6 @@ const app = {
         const pointsEarned = POINTS_PER_WIN + (kills * POINTS_PER_KILL);
         
         try {
-            // 1. Save result in the match object
             await db.ref(`matches/${mode}/${matchId}/result`).set({
                 winnerUid: winnerUid,
                 kills: kills,
@@ -365,12 +477,10 @@ const app = {
                 submittedBy: currentUser.email.split('@')[0]
             });
             
-            // 2. Update the Leaderboard
             await app.updateLeaderboard(winnerUid, kills, pointsEarned);
             
             displayMessage(messageDiv, `Results submitted successfully and leaderboard updated!`, 'success');
             
-            // Clear inputs and refresh dropdown
             document.getElementById('adminResultMatchSelect').value = '';
             document.getElementById('resultWinnerUid').value = '';
             document.getElementById('resultWinnerKills').value = '';
@@ -382,23 +492,38 @@ const app = {
         }
     },
     
-    // Update/Increment Leaderboard Data
     updateLeaderboard: async (winnerUid, kills, pointsEarned) => {
         const leaderboardRef = db.ref(`leaderboard/${winnerUid}`);
+        
+        let winnerUsername = 'Unknown Player';
+        try {
+            // Find the user object by ffUid
+            const userSnapshot = await db.ref('users').orderByChild('ffUid').equalTo(winnerUid).limitToFirst(1).once('value');
+            userSnapshot.forEach(childSnap => {
+                winnerUsername = childSnap.val().username || 'Unknown Player';
+            });
+        } catch(e) {
+             console.warn("Could not fetch winner username for leaderboard:", e);
+        }
+
         try {
              await leaderboardRef.transaction(currentStats => {
                  if (currentStats === null) {
                      return {
                          ffUid: winnerUid,
+                         username: winnerUsername, 
                          wins: 1,
                          totalKills: kills,
                          totalPoints: pointsEarned,
                      };
                  } else {
-                     // Ensure fields exist before incrementing
                      currentStats.wins = (currentStats.wins || 0) + 1;
                      currentStats.totalKills = (currentStats.totalKills || 0) + kills;
                      currentStats.totalPoints = (currentStats.totalPoints || 0) + pointsEarned;
+                     // Only update username if the existing one is 'Unknown Player' or not set.
+                     if (currentStats.username === 'Unknown Player' || !currentStats.username) {
+                        currentStats.username = winnerUsername; 
+                     }
                      return currentStats;
                  }
              });
@@ -407,10 +532,9 @@ const app = {
         }
     },
     
-    // Render Leaderboard (Needed for index.html)
     renderLeaderboard: () => {
         const leaderboardBody = document.getElementById('leaderboardBody');
-        leaderboardBody.innerHTML = '<tr><td colspan="5">Loading Leaderboard...</td></tr>';
+        leaderboardBody.innerHTML = '<tr><td colspan="6">Loading Leaderboard...</td></tr>'; 
         
         db.ref('leaderboard').once('value', (snapshot) => {
             const stats = [];
@@ -418,7 +542,6 @@ const app = {
                 stats.push(childSnap.val());
             });
             
-            // Sort: Points (desc), Wins (desc), Kills (desc)
             stats.sort((a, b) => {
                 if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
                 if (b.wins !== a.wins) return b.wins - a.wins;
@@ -428,24 +551,26 @@ const app = {
             leaderboardBody.innerHTML = '';
             
             if (stats.length === 0) {
-                 leaderboardBody.innerHTML = '<tr><td colspan="5">No match results submitted yet.</td></tr>';
+                 leaderboardBody.innerHTML = '<tr><td colspan="6">No match results submitted yet.</td></tr>';
                  return;
             }
             stats.forEach((player, index) => {
                 const rank = index + 1;
+                // ⭐️ Use username or fallback to UID for display
+                const displayName = player.username || player.ffUid; 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>#${rank}</td>
-                    <td>${player.ffUid}</td>
-                    <td>${player.wins}</td>
-                    <td>${player.totalKills}</td>
-                    <td>${player.totalPoints}</td>
+                     <td>#${rank}</td>
+                     <td>${displayName}</td>
+                     <td>${player.ffUid}</td> 
+                     <td>${player.wins}</td>
+                     <td>${player.totalKills}</td>
+                     <td>${player.totalPoints}</td>
                 `;
                 leaderboardBody.appendChild(row);
             });
         });
     },
-
 
     renderAdminMatches: () => {
         if (!isAdmin) return;
@@ -466,10 +591,13 @@ const app = {
                 const matchTime = new Date(match.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const div = document.createElement('div');
                 div.className = 'admin-match-item';
+                const matchDataString = JSON.stringify(match).split('"').join("'").split("'").join("`");
+
                 div.innerHTML = `
                     <span>${match.mode} • ${match.name} (${matchTime})</span>
                     <div>
                         <button class="admin-details-btn" onclick="app.viewAdminSlotDetails('${match.mode}', '${match.id}');">View Details</button>
+                        <button class="admin-edit-btn" onclick="app.adminEditMatch('${match.mode}', '${match.id}', JSON.parse(\`${matchDataString}\`));">Edit Room</button>
                         <button onclick="app.deleteMatch('${match.mode}', '${match.id}', true);">Delete</button>
                         <button onclick="app.clearSlots('${match.mode}', '${match.id}');">Clear Slots</button>
                     </div>
@@ -494,30 +622,29 @@ const app = {
             detailsHtml += `<p><strong>Pass:</strong> ${match.roomPass}</p>`;
             detailsHtml += `<h3>Slots (${Object.keys(slots).length}/${match.maxSlots})</h3>`;
             
-            db.ref('users').once('value', (userSnap) => {
-                let userDetailsHtml = '<ul style="list-style: none; padding: 0;">';
-                for (let i = 1; i <= match.maxSlots; i++) {
-                    const slotKey = `slot${i}`;
-                    const slotData = slots[slotKey];
-                    
-                    if (slotData) {
-                        const ffUid = slotData.ffUid || 'N/A'; 
+            let userDetailsHtml = '<ul style="list-style: none; padding: 0;">';
+            for (let i = 1; i <= match.maxSlots; i++) {
+                const slotKey = `slot${i}`;
+                const slotData = slots[slotKey];
+                
+                if (slotData) {
+                    const displayName = slotData.username || slotData.email.split('@')[0];
+                    const ffUid = slotData.ffUid || 'N/A'; 
 
-                        userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
-                            <strong>Slot ${i}:</strong> ${slotData.email.split('@')[0]}
-                            <br>
-                            <span style="color: var(--success-green); font-size: 0.9em; margin-left: 10px;">FF UID: ${ffUid}</span>
-                        </li>`;
-                    } else {
-                         userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
-                            <strong>Slot ${i}:</strong> FREE
-                        </li>`;
-                    }
+                    userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
+                        <strong>Slot ${i}:</strong> ${displayName}
+                        <br>
+                        <span style="color: var(--success-green); font-size: 0.9em; margin-left: 10px;">FF UID: ${ffUid}</span>
+                    </li>`;
+                } else {
+                     userDetailsHtml += `<li style="padding: 5px; border-bottom: 1px dotted var(--neon-purple); text-align: left;">
+                        <strong>Slot ${i}:</strong> FREE
+                    </li>`;
                 }
-                userDetailsHtml += '</ul>';
+            }
+            userDetailsHtml += '</ul>';
 
-                alert(`Admin Match Details:\n\nMatch: ${match.name}\nRoom ID: ${match.roomId}\nRoom Pass: ${match.roomPass}\n\nSLOTS:\n${userDetailsHtml.replace(/<[^>]*>?/gm, '\n').replace(/&nbsp;/g, ' ').trim()}`);
-            });
+            alert(`Admin Match Details:\n\nMatch: ${match.name}\nRoom ID: ${match.roomId}\nRoom Pass: ${match.roomPass}\n\nSLOTS:\n${userDetailsHtml.replace(/<[^>]*>?/gm, '\n').replace(/&nbsp;/g, ' ').trim()}`);
         });
     },
 
@@ -528,14 +655,13 @@ const app = {
         if (isManual && !confirm('Are you sure you want to delete this match?')) return;
         
         try {
-            // Clear interval if it exists
             if (matchIntervals[matchId]) {
-                 clearInterval(matchIntervals[matchId]);
-                 delete matchIntervals[matchId];
+                clearInterval(matchIntervals[matchId]);
+                delete matchIntervals[matchId];
             }
             await db.ref(`matches/${mode}/${matchId}`).remove();
             console.log(`Match ${matchId} deleted.`);
-            app.renderAdminResultSelect(); // Refresh admin list/dropdown
+            app.renderAdminResultSelect(); 
         } catch (error) {
             console.error("Deletion error:", error);
         }
@@ -561,7 +687,7 @@ const app = {
         app.listenForMatches(mode);
     },
     
-    // Timer Update & Auto-Delete Logic
+    // Timer Update & Auto-Delete Logic (Same as previous update)
     updateMatchTimer: (matchId, matchData, mode) => {
         const now = Date.now();
         const startTime = matchData.startTime;
@@ -579,7 +705,10 @@ const app = {
         const matchContainer = document.getElementById('mainContainer');
         const matchDetailsElement = document.getElementById('currentMatchDetails');
         const slotTimerElement = document.getElementById('slotPageTimer'); 
-        const userInMatch = currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid);
+        
+        const slotStatusSpan = document.querySelector('#currentMatchDetails [data-match-status-id="slot-page-status"]');
+
+        const userInMatch = currentUser && currentMatchData && Object.values(currentMatchData.slots || {}).some(s => s.uid === currentUser.uid);
 
         if (timeDiffSeconds > 0) {
             // Upcoming Match
@@ -595,17 +724,21 @@ const app = {
 
             statusSpan.textContent = 'Upcoming';
             statusSpan.className = 'status upcoming';
+            if (slotStatusSpan) {
+                slotStatusSpan.textContent = 'Upcoming';
+                slotStatusSpan.className = 'status upcoming';
+            }
             
             if (isCurrentlyViewing) {
                  app.revealRoomInfo('********', '********');
             }
 
-            // 1 Minute Warning (60 seconds)
             if (isCurrentlyViewing) {
-                if (timeDiffSeconds === 60) {
+                // ⭐️ Warning period changed to 30 seconds
+                if (timeDiffSeconds === 30) {
                     playWarningSound(); 
                     matchDetailsElement.classList.add('warning-animation'); 
-                } else if (timeDiffSeconds > 60) {
+                } else if (timeDiffSeconds > 30) {
                     matchDetailsElement.classList.remove('warning-animation');
                     matchDetailsElement.classList.remove('critical-warning'); 
                     matchContainer.classList.remove('screen-shake');
@@ -635,8 +768,11 @@ const app = {
 
             statusSpan.textContent = 'LIVE';
             statusSpan.className = 'status live';
+            if (slotStatusSpan) {
+                slotStatusSpan.textContent = 'LIVE';
+                slotStatusSpan.className = 'status live';
+            }
             
-            // Room Reveal - Only if user is in match
             if(isCurrentlyViewing) {
                 if (userInMatch) {
                    app.revealRoomInfo(matchData.roomId, matchData.roomPass);
@@ -668,6 +804,10 @@ const app = {
             timerSpan.textContent = 'DELETED';
             statusSpan.textContent = 'DELETED';
             statusSpan.className = 'status ended';
+            if (slotStatusSpan) {
+                slotStatusSpan.textContent = 'DELETED';
+                slotStatusSpan.className = 'status ended';
+            }
             
             if(matchIntervals[matchId]) {
                 clearInterval(matchIntervals[matchId]);
@@ -698,8 +838,11 @@ const app = {
         currentMatchId = matchId;
         currentMode = mode;
         
-        db.ref(`users/${currentUser.uid}/ffUid`).once('value', (snapshot) => {
-            currentUser.ffUid = snapshot.val(); 
+        db.ref(`users/${currentUser.uid}`).once('value', (snapshot) => {
+            const userData = snapshot.val() || {};
+            currentUser.ffUid = userData.ffUid;
+            currentUser.username = userData.username || currentUser.email.split('@')[0];
+            
             app.showPage('slotPage');
             app.listenForSlots(mode, matchId); 
         });
@@ -716,31 +859,24 @@ const app = {
             }
 
             document.getElementById('slotPageMatchTitle').textContent = currentMatchData.name;
-            document.getElementById('matchNameDisplay').textContent = currentMatchData.name;
-            document.getElementById('matchModeDisplay').textContent = currentMatchData.mode.toUpperCase();
+            
+            // ⭐️ Display the persistent match details
+            document.querySelector('#currentMatchDetails [data-match-mode]').textContent = currentMatchData.mode.toUpperCase();
+            document.querySelector('#currentMatchDetails [data-match-start]').textContent = new Date(currentMatchData.startTime).toLocaleString();
             
             const slots = currentMatchData.slots || {};
             const maxSlots = currentMatchData.maxSlots;
             const slotsContainer = document.getElementById('slotsContainer');
             slotsContainer.innerHTML = '';
             
-            document.getElementById('maxSlots').textContent = maxSlots;
-            document.getElementById('slotsCount').textContent = Object.keys(slots).length;
+            document.querySelector('#currentMatchDetails [data-match-slots]').textContent = `${Object.keys(slots).length}/${maxSlots}`;
             
             app.updateMatchTimer(matchId, currentMatchData, mode); 
             
             const userInMatch = Object.values(slots).some(s => s.uid === currentUser.uid);
             const isMatchStarted = (currentMatchData.startTime - Date.now() <= 0);
 
-            const ffUidInputSection = document.getElementById('ffUidInputSection');
-            const ffUidInput = document.getElementById('ffUidInput');
-            ffUidInput.value = currentUser.ffUid || ''; 
-            
-            if (!userInMatch && !isMatchStarted) {
-                ffUidInputSection.classList.remove('hidden');
-            } else {
-                ffUidInputSection.classList.add('hidden');
-            }
+            const profileSet = currentUser && currentUser.ffUid && currentUser.username;
             
             if (userInMatch && isMatchStarted) {
                 app.revealRoomInfo(currentMatchData.roomId, currentMatchData.roomPass);
@@ -760,7 +896,9 @@ const app = {
                 let button;
                 if (slotData) {
                     div.classList.add('occupied');
-                    div.innerHTML = `<span class="slot-name">Slot ${i}: ${slotData.ffUid} (${slotData.email.split('@')[0]})</span>`;
+                    const displayName = slotData.username || slotData.email.split('@')[0];
+                    // ⭐️ FF UID HIDDEN FROM USER VIEW HERE
+                    div.innerHTML = `<span class="slot-name">Slot ${i}: ${displayName}</span>`; 
                     
                     if (slotData.uid === currentUser.uid) {
                         button = document.createElement('button');
@@ -776,8 +914,7 @@ const app = {
                     div.innerHTML = `<span class="slot-name">Slot ${i}: FREE</span>`;
                     
                     button = document.createElement('button');
-                    const currentUidInInput = ffUidInput.value;
-
+                    
                     if (isMatchStarted) {
                         button.textContent = 'Match Started';
                         button.disabled = true;
@@ -785,13 +922,18 @@ const app = {
                     } else if (userInMatch) {
                          button.textContent = 'Already Joined';
                          button.disabled = true;
-                    } else if (!currentUidInInput) {
-                         button.textContent = 'Fill UID Above';
+                    } else if (!profileSet) { 
+                         button.textContent = 'Set Profile First';
                          button.disabled = true;
+                         button.onclick = () => {
+                             playWarningSound();
+                             alert("Please set your In-Game Name and FF UID on the Profile Page before joining a slot.");
+                             app.showPage('profilePage'); // Redirect to profile page
+                         };
                     } else {
                          button.textContent = `Join Slot`;
                          button.disabled = false;
-                         button.onclick = () => app.promptAndJoinSlot(mode, matchId, slotKey, currentUidInInput);
+                         button.onclick = () => app.promptAndJoinSlot(mode, matchId, slotKey, currentUser.ffUid, currentUser.username); 
                     }
                 }
 
@@ -801,18 +943,19 @@ const app = {
         });
     },
     
-    promptAndJoinSlot: (mode, matchId, slotKey, uidToUse) => {
+    promptAndJoinSlot: (mode, matchId, slotKey, uidToUse, usernameToUse) => {
         playClickSound();
-        const confirmJoin = confirm(`Are you sure you want to join ${slotKey} with FF UID ${uidToUse}?`);
+        // ⭐️ Updated prompt to only show IGN, not UID
+        const confirmJoin = confirm(`Are you sure you want to join ${slotKey} with IGN ${usernameToUse}?`); 
         
         if (confirmJoin) {
-            app.joinSlot(mode, matchId, slotKey, uidToUse);
+            app.joinSlot(mode, matchId, slotKey, uidToUse, usernameToUse); 
         } else {
             displayMessage(document.getElementById('slotPageMessage'), 'Slot joining cancelled.', 'error');
         }
     },
 
-    joinSlot: async (mode, matchId, slotKey, uidToUse) => {
+    joinSlot: async (mode, matchId, slotKey, uidToUse, usernameToUse) => {
         playClickSound();
         const messageDiv = document.getElementById('slotPageMessage');
         messageDiv.classList.add('hidden');
@@ -826,16 +969,11 @@ const app = {
                         return undefined; 
                     }
                     
-                    if (uidToUse && uidToUse !== currentUser.ffUid) {
-                        db.ref(`users/${currentUser.uid}/ffUid`).set(uidToUse);
-                        currentUser.ffUid = uidToUse; 
-                        document.getElementById('ffUidInput').value = uidToUse; 
-                    }
-                    
                     return { 
                         uid: currentUser.uid, 
                         email: currentUser.email, 
-                        ffUid: uidToUse 
+                        ffUid: uidToUse,
+                        username: usernameToUse
                     };
                 } else {
                     return undefined; 
@@ -870,17 +1008,24 @@ const app = {
 
     showLeaderboard: () => {
         playClickSound();
+        app.renderLeaderboard();
         app.showPage('leaderboardPage');
     },
 
     displayMessage: displayMessage,
 
     listenForMatches: (mode) => {
+        if (activeMatchListListener) {
+            db.ref(activeMatchListListener.path).off('value', activeMatchListListener.callback);
+            activeMatchListListener = null;
+        }
+        
         Object.values(matchIntervals).forEach(clearInterval);
         matchIntervals = {};
-        db.ref(`matches/${mode}`).off();
 
-        db.ref(`matches/${mode}`).on('value', (snapshot) => {
+        const matchesRef = db.ref(`matches/${mode}`);
+        
+        const callback = (snapshot) => {
             const matchesContainer = document.getElementById('matchesContainer');
             matchesContainer.innerHTML = '';
             const matches = [];
@@ -898,12 +1043,17 @@ const app = {
             matches.forEach(match => {
                 app.renderMatchCard(match, matchesContainer);
             });
-        });
+        };
+
+        matchesRef.on('value', callback);
+        activeMatchListListener = { path: `matches/${mode}`, callback: callback };
     },
 
     renderMatchCard: (match, container) => {
         const div = document.createElement('div');
         div.className = 'match-item';
+        div.setAttribute('data-match-id', match.id); 
+        
         div.innerHTML = `
             <h4>${match.name}</h4>
             <div class="match-details">
@@ -911,7 +1061,7 @@ const app = {
                 <span><strong>Start:</strong> ${new Date(match.startTime).toLocaleString()}</span>
                 <span><strong>Slots:</strong> ${Object.keys(match.slots || {}).length}/${match.maxSlots}</span>
                 <span><strong>Status:</strong> <span data-match-status-id="${match.id}" class="status">Upcoming</span></span>
-                <span><strong>Timer:</strong> <span data-match-timer-id="${match.id}">--:--:--</span></span>
+                <span><strong>Timer:</strong> <span data-match-timer-id="${match.id}">--:--:{--}</span></span>
             </div>
             <button onclick="app.joinMatch('${match.id}', '${match.mode}');" style="margin-top: 10px;">View & Join</button>
         `;
@@ -932,10 +1082,10 @@ const app = {
 // --- 4. INITIALIZATION ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Start Firebase Initialization and Auth Listening
+    initializeBackgroundMusic(); // Initialize the new background music element
+
     app.init(); 
     
-    // Attach sound to buttons globally (after app.init loads everything)
     document.querySelectorAll('button:not([onclick^="app.showPage"]), a[onclick], button[onclick]').forEach(element => {
         const originalOnClick = element.getAttribute('onclick');
         if (originalOnClick && !originalOnClick.startsWith('playClickSound()') && !originalOnClick.startsWith('app.showPage')) {
