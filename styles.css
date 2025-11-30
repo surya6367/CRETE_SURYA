@@ -65,10 +65,10 @@ h1, h2, h3, h4 {
 }
 
 
-/* ⭐️ LOGO STYLE */
+/* ⭐️ LOGO STYLE: Size increased to 90px (4.) */
 .circular-logo {
-    width: 70px; 
-    height: 70px;
+    width: 90px; 
+    height: 90px;
     background-image: url('https://homely-white-ji4fmmoync-eo5h3w2ugd.edgeone.dev/Gemini_Generated_Image_7mpphq7mpphq7mpp.png');
     background-size: cover; 
     background-repeat: no-repeat; 
@@ -633,7 +633,7 @@ select:focus {
         padding: 10px 20px;
         font-size: 0.9em;
     }
-    /* ⭐️ UPDATED: Mobile now uses 2x2 grid to look like PC */
+    /* ⭐️ 3. Mobile uses 2x2 grid to look like PC */
     .mode-grid {
         grid-template-columns: 1fr 1fr; /* 2 columns for smaller screens */
         gap: 15px;
